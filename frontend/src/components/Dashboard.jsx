@@ -3529,6 +3529,11 @@ const Dashboard = () => {
             const isProjectFrozen = currentCap?.project?.projectState === 'FREEZE';
             const canEditCurrentCap = !hasActionDone && isDraftStatus && !isProjectFrozen;
 
+            // 프로젝트별 CAP 번호 (1번부터 시작)
+            const selectedCapIndex = projectCaps.findIndex(f => f.findingId === selectedCapId);
+            const selectedCapDisplayNum = selectedCapIndex >= 0 ? (selectedCapIndex + 1) : '';
+            const nextCapDisplayNum = projectCaps.length + 1;
+
             // 4. 감사관련 사용자 목록 추출
             const auditUsers = usersList.filter(u =>
               ['SYSTEM_ADMIN', 'AUDIT_LEADER', 'AUDITOR'].includes(u.role) && u.enabled !== false
@@ -3558,21 +3563,22 @@ const Dashboard = () => {
                   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
                   borderBottom: '2px solid #cbd5e1',
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>
+                  {/* 헤더: 타이틀과 안내사항을 한 줄 가로 배치하여 세로 공간 대폭 절약 */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '12px' }}>
+                      <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b', fontWeight: 'bold' }}>
                         감사 지적사항 (CAP) 관리 및 등록
                       </h3>
-                      <p style={{ ...styles.cardSubtitle, margin: '4px 0 0 0' }}>
-                        감사 프로젝트별 지적사항을 등록 및 수정하고, 감사팀 마감기한을 관리합니다. (감사팀 전용)
-                      </p>
+                      <span style={{ fontSize: '12.5px', color: '#64748b' }}>
+                        감사 프로젝트별 지적사항을 등록 및 수정하고, 감사팀 마감기한을 관리합니다.
+                      </span>
                     </div>
                     {/* 카테고리 관리 버튼 */}
                     <button
                       type="button"
                       onClick={() => setCategoryModalOpen(true)}
                       style={{
-                        padding: '8px 14px',
+                        padding: '6px 14px',
                         backgroundColor: 'var(--saea-blue, #0077C8)',
                         color: '#ffffff',
                         border: 'none',
@@ -3584,33 +3590,28 @@ const Dashboard = () => {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
+                        whiteSpace: 'nowrap'
                       }}
                     >
                       분류 카테고리 관리
                     </button>
                   </div>
 
-                  {/* 1) 대상 감사 프로젝트 선택 영역 (FREEZE 필터 옵션 포함) */}
+                  {/* 1) 대상 감사 프로젝트 선택 영역 (1행 정렬로 세로 공간 확보) */}
                   <div style={{
-                    padding: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '10px 14px',
                     backgroundColor: '#f8fafc',
                     border: '1px solid #e2e8f0',
                     borderRadius: '8px',
-                    marginBottom: '20px',
+                    marginBottom: '14px',
+                    flexWrap: 'wrap',
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '8px' }}>
-                      <label style={{ ...styles.formLabel, marginBottom: 0, fontWeight: 'bold', color: '#1e293b' }}>
-                        대상 감사 프로젝트 선택 <span style={{ color: '#ef4444' }}>*</span>
-                      </label>
-                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer', color: '#475569', fontWeight: 'bold' }}>
-                        <input
-                          type="checkbox"
-                          checked={includeFrozenProjects}
-                          onChange={(e) => setIncludeFrozenProjects(e.target.checked)}
-                        />
-                        <span>동결(FREEZE) 프로젝트 포함 조회</span>
-                      </label>
-                    </div>
+                    <label style={{ margin: 0, fontSize: '13px', fontWeight: 'bold', color: '#1e293b', whiteSpace: 'nowrap' }}>
+                      대상 감사 프로젝트 선택 <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
 
                     <select
                       value={selectedProjectId}
@@ -3618,7 +3619,7 @@ const Dashboard = () => {
                         setSelectedProjectId(e.target.value);
                         handleSelectCap(null); // 프로젝트 변경 시 CAP 선택 초기화
                       }}
-                      style={styles.select}
+                      style={{ ...styles.select, flex: 1, minWidth: '300px', margin: 0, padding: '7px 10px', fontSize: '13px' }}
                       required
                     >
                       <option value="">-- 대상 프로젝트를 선택하세요 --</option>
@@ -3628,156 +3629,253 @@ const Dashboard = () => {
                         </option>
                       ))}
                     </select>
+
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', cursor: 'pointer', color: '#475569', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                      <input
+                        type="checkbox"
+                        checked={includeFrozenProjects}
+                        onChange={(e) => setIncludeFrozenProjects(e.target.checked)}
+                      />
+                      <span>동결(FREEZE) 포함</span>
+                    </label>
                   </div>
 
-                  {/* 4) 대상 감사 프로젝트별 등록된 CAP 선택 항목 리스트 */}
+                  {/* 4) 대상 감사 프로젝트별 등록된 CAP 선택 항목 리스트 (프로젝트가 선택되었을 때만 표시) */}
                   {selectedProjectId && (
                     <div style={{
-                      padding: '16px',
+                      padding: '14px 16px',
                       backgroundColor: '#f1f5f9',
                       border: '1px solid #cbd5e1',
                       borderRadius: '8px',
-                      marginBottom: '20px',
+                      marginBottom: '14px',
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>
-                          해당 프로젝트 등록 지적사항 (CAP) 선택 ({projectCaps.length}건)
+                          해당 프로젝트 등록 지적사항 (CAP) 선택 ({projectCaps.length}건 등록됨)
                         </div>
                         <button
                           type="button"
                           onClick={() => handleSelectCap(null)}
                           style={{
                             padding: '6px 14px',
-                            backgroundColor: selectedCapId === null ? '#059669' : '#ffffff',
-                            color: selectedCapId === null ? '#ffffff' : '#059669',
-                            border: '1px solid #059669',
+                            backgroundColor: selectedCapId === null ? '#16a34a' : '#ffffff',
+                            color: selectedCapId === null ? '#ffffff' : '#16a34a',
+                            border: '1.5px solid #16a34a',
                             borderRadius: '6px',
                             fontSize: '13px',
                             fontWeight: 'bold',
                             cursor: 'pointer',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                            boxShadow: selectedCapId === null ? '0 2px 4px rgba(22,163,74,0.25)' : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            transition: 'all 0.15s ease'
                           }}
                         >
-                          신규 지적사항 등록 모드 {selectedCapId === null ? '선택됨' : ''}
+                          {selectedCapId === null ? `✔ CAP #${nextCapDisplayNum} 신규 등록 모드 활성` : `+ CAP #${nextCapDisplayNum} 신규 지적사항 등록`}
                         </button>
                       </div>
 
-                      {projectCaps.length === 0 ? (
-                        <div style={{ fontSize: '13px', color: '#64748b', padding: '10px 0' }}>
-                          이 프로젝트에 등록된 지적사항(CAP)이 없습니다. 아래 폼에서 새로운 지적사항을 등록해 주세요.
-                        </div>
-                      ) : (
-                        <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                          gap: '10px',
-                          marginTop: '6px',
-                          maxHeight: '200px',
-                          overflowY: 'auto',
-                          paddingRight: '4px'
-                        }}>
-                          {projectCaps.map(cap => {
-                            const isSelected = selectedCapId === cap.findingId;
-                            const hasAct = cap.actionText && cap.actionText.trim() !== '';
-                            const isDr = cap.approvalStatus === 'DRAFT' || !cap.approvalStatus;
-                            const editable = !hasAct && isDr && cap.project?.projectState !== 'FREEZE';
-                            return (
-                              <div
-                                key={cap.findingId}
-                                onClick={() => handleSelectCap(cap)}
-                                style={{
-                                  padding: '10px 14px',
-                                  backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
-                                  border: isSelected ? '2px solid #2563eb' : '1px solid #cbd5e1',
-                                  borderRadius: '6px',
-                                  cursor: 'pointer',
-                                  boxShadow: isSelected ? '0 2px 4px rgba(37,99,235,0.15)' : 'none',
-                                  transition: 'all 0.15s ease',
-                                }}
-                              >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b' }}>
-                                    CAP #{cap.findingId}
-                                  </span>
-                                  <span style={styles.badgeCategory}>{cap.category}</span>
-                                </div>
-                                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {cap.title}
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#64748b' }}>
-                                  <span style={{ color: editable ? '#059669' : (isAuditTeam ? '#2563eb' : '#dc2626'), fontWeight: 'bold' }}>
-                                    {editable ? '수정가능' : (isAuditTeam ? '담당자·유관부서 변경가능' : (hasAct ? '조치작성됨' : '결재진행중'))}
-                                  </span>
-                                  <span>{cap.approvalStatus || 'DRAFT'}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
+                      {projectCaps.length === 0 && (
+                        <div style={{ fontSize: '12.5px', color: '#166534', backgroundColor: '#f0fdf4', padding: '8px 12px', borderRadius: '6px', border: '1px solid #bbf7d0', marginBottom: '8px' }}>
+                          ※ 본 프로젝트에 기존 등록된 지적사항이 없습니다. 아래 <b>CAP #1</b> 카드를 작성하여 첫 번째 지적사항을 등록하세요.
                         </div>
                       )}
+
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                        gap: '10px',
+                        marginTop: '6px',
+                        maxHeight: '220px',
+                        overflowY: 'auto',
+                        paddingRight: '4px'
+                      }}>
+                        {projectCaps.map((cap, capIdx) => {
+                          const isSelected = selectedCapId === cap.findingId;
+                          const hasAct = cap.actionText && cap.actionText.trim() !== '';
+
+                          // 직관적이고 선명한 CAP 진행 상태 뱃지
+                          const getStatusBadge = () => {
+                            if (cap.project?.projectState === 'FREEZE') {
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#334155', color: '#ffffff' }}>동결(FREEZE)</span>;
+                            }
+                            const st = cap.approvalStatus || 'DRAFT';
+                            if (st === 'APPROVED') {
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }}>승인 완료</span>;
+                            }
+                            if (st === 'REJECTED') {
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}>반려</span>;
+                            }
+                            if (st === 'PENDING_APPROVER') {
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#ffedd5', color: '#c2410c', border: '1px solid #fdba74' }}>최종승인 대기</span>;
+                            }
+                            if (st === 'PENDING_AUDITOR') {
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#f3e8ff', color: '#7e22ce', border: '1px solid #d8b4fe' }}>감사팀 검토중</span>;
+                            }
+                            if (hasAct) {
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc' }}>조치작성 완료</span>;
+                            }
+                            return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>조치 대기</span>;
+                          };
+
+                          return (
+                            <div
+                              key={cap.findingId}
+                              onClick={() => handleSelectCap(cap)}
+                              style={{
+                                padding: '10px 14px',
+                                backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
+                                border: isSelected ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                boxShadow: isSelected ? '0 2px 4px rgba(37,99,235,0.15)' : 'none',
+                                transition: 'all 0.15s ease',
+                              }}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#1e293b' }}>
+                                  CAP #{capIdx + 1}
+                                </span>
+                                <span style={styles.badgeCategory}>{cap.category}</span>
+                              </div>
+                              <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {cap.title}
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                {getStatusBadge()}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* 신규 등록용 CAP # 다음 번호 카드 (신규 등록 모드임을 한눈에 알 수 있도록 항상 생성) */}
+                        <div
+                          onClick={() => handleSelectCap(null)}
+                          style={{
+                            padding: '10px 14px',
+                            backgroundColor: selectedCapId === null ? '#f0fdf4' : '#fafafa',
+                            border: selectedCapId === null ? '2px solid #16a34a' : '1.5px dashed #94a3b8',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            boxShadow: selectedCapId === null ? '0 2px 6px rgba(22,163,74,0.25)' : 'none',
+                            transition: 'all 0.15s ease',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between'
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 'bold', color: selectedCapId === null ? '#15803d' : '#64748b' }}>
+                                CAP #{nextCapDisplayNum}
+                              </span>
+                              <span style={{
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                backgroundColor: selectedCapId === null ? '#dcfce7' : '#e2e8f0',
+                                color: selectedCapId === null ? '#15803d' : '#64748b',
+                                border: selectedCapId === null ? '1px solid #86efac' : '1px solid #cbd5e1'
+                              }}>
+                                {selectedCapId === null ? '신규 등록 중' : '+ 신규 추가'}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '13px', fontWeight: 'bold', color: selectedCapId === null ? '#166534' : '#64748b', marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {selectedCapId === null && newTitle.trim() ? newTitle : '(신규 지적사항 작성)'}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 'bold', color: selectedCapId === null ? '#16a34a' : '#94a3b8' }}>
+                              {selectedCapId === null ? '● 현재 입력 모드' : '클릭 시 신규 등록'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* 2. 하단 선택된 CAP 상세 및 수정 폼 카드 (상단 CAP 선택 후 하단 폼 독립 스크롤) */}
-                <div style={styles.card}>
+                {/* 2. 하단 선택된 CAP 상세 및 수정 폼 카드 (대상 프로젝트가 선택되었을 때만 노출) */}
+                {selectedProjectId && (
+                  <div style={styles.card}>
 
-                  {/* 5) 수정 안내 배너 (추가 작업이 진행된 건인 경우에도 감사팀은 담당자/유관부서 상시 수정 가능) */}
-                  {selectedCapId && !canEditCurrentCap && (
-                    <div style={{
-                      ...styles.freezeNotice,
-                      marginBottom: '20px',
-                      backgroundColor: isAuditTeam ? '#eff6ff' : '#fef2f2',
-                      borderColor: isAuditTeam ? '#93c5fd' : '#fecaca',
-                      color: isAuditTeam ? '#1e40af' : '#991b1b',
-                      padding: '12px 16px',
-                      borderRadius: '8px'
-                    }}>
-                      {isAuditTeam ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span>
-                            <b>감사팀 상시 권한 안내:</b> 본 지적사항은 {isProjectFrozen ? '동결(Freeze)' : hasActionDone ? '조치작성' : '결재진행'} 상태로 기본 본문(제목/내용)은 고정되지만, <b>감사담당자/감사책임자는 조건과 관계없이 언제든지 대상 법인 담당자 및 유관부서를 추가·변경하여 즉시 저장할 수 있습니다.</b>
-                          </span>
+                    {/* 동결 프로젝트 또는 일반 사용자 읽기전용 시 간소 알림 */}
+                    {selectedCapId && !canEditCurrentCap && !isAuditTeam && (
+                      <div style={{
+                        ...styles.freezeNotice,
+                        marginBottom: '14px',
+                        padding: '8px 14px',
+                        fontSize: '12.5px',
+                        borderRadius: '6px'
+                      }}>
+                        {isProjectFrozen
+                          ? '※ 본 프로젝트는 최종 승인 완료로 동결(Freeze) 상태이므로 지적사항을 수정할 수 없습니다 (읽기 전용).'
+                          : '※ 본 지적사항은 이미 조치 작성 또는 결재 진행 중이므로 내용을 수정할 수 없습니다 (읽기 전용).'}
+                      </div>
+                    )}
+
+                    {/* CAP 등록 / 수정 폼 */}
+                    <form onSubmit={handleSaveFinding} style={styles.form}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          {selectedCapId ? (
+                            <>
+                              <span style={{
+                                padding: '3px 10px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                                backgroundColor: '#eff6ff',
+                                color: '#1d4ed8',
+                                border: '1px solid #bfdbfe'
+                              }}>
+                                {canEditCurrentCap ? '수정 모드' : '상세 조회'}
+                              </span>
+                              <h4 style={{ margin: 0, fontSize: '15px', color: '#1e293b' }}>
+                                지적사항 (CAP #{selectedCapDisplayNum}) {canEditCurrentCap ? '내용 수정' : '상세 조회'}
+                              </h4>
+                            </>
+                          ) : (
+                            <>
+                              <span style={{
+                                padding: '3px 10px',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                                backgroundColor: '#dcfce7',
+                                color: '#15803d',
+                                border: '1px solid #86efac'
+                              }}>
+                                신규 등록 모드
+                              </span>
+                              <h4 style={{ margin: 0, fontSize: '15px', color: '#15803d', fontWeight: 'bold' }}>
+                                지적사항 (CAP #{nextCapDisplayNum}) 신규 등록 입력
+                              </h4>
+                            </>
+                          )}
                         </div>
-                      ) : (
-                        isProjectFrozen ? (
-                          '※ 본 프로젝트는 최종 승인 완료로 동결(Freeze) 상태이므로 지적사항을 수정할 수 없습니다 (읽기 전용).'
-                        ) : hasActionDone ? (
-                          '※ 본 지적사항은 이미 현업의 개선 조치내역이 작성되었으므로 내용을 수정할 수 없습니다 (읽기 전용).'
-                        ) : (
-                          '※ 본 지적사항은 이미 결재(승인) 프로세스가 진행 중이므로 내용을 수정할 수 없습니다 (읽기 전용).'
-                        )
-                      )}
-                    </div>
-                  )}
+                        {selectedCapId && (
+                          <button
+                            type="button"
+                            onClick={() => handleSelectCap(null)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#16a34a',
+                              fontSize: '13px',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              textDecoration: 'underline'
+                            }}
+                          >
+                            + CAP #{nextCapDisplayNum} 신규 등록 모드로 전환
+                          </button>
+                        )}
+                      </div>
 
-                  {/* CAP 등록 / 수정 폼 */}
-                  <form onSubmit={handleSaveFinding} style={styles.form}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                      <h4 style={{ margin: 0, fontSize: '15px', color: '#1e293b' }}>
-                        {selectedCapId
-                          ? `지적사항 (CAP #${selectedCapId}) ${canEditCurrentCap ? '내용 수정' : '상세 조회'}`
-                          : '새로운 지적사항 (CAP) 입력'}
-                      </h4>
-                      {selectedCapId && (
-                        <button
-                          type="button"
-                          onClick={() => handleSelectCap(null)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#2563eb',
-                            fontSize: '13px',
-                            fontWeight: 'bold',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          신규 등록 모드로 전환
-                        </button>
-                      )}
-                    </div>
-
-                    <div style={styles.dateRow}>
+                      <div style={styles.dateRow}>
                       {/* 1) 분류 카테고리 (기존 데이터 목록 + 직접 입력 지원) */}
                       <div style={{ ...styles.formGroup, flex: 1 }}>
                         <label style={styles.formLabel}>분류 카테고리 <span style={{ color: '#ef4444' }}>*</span></label>
@@ -3848,100 +3946,6 @@ const Dashboard = () => {
                       />
                     </div>
 
-                    {/* 2) 담당 감사자 (로그인 사용자 포함 복수 지정 기능) */}
-                    <div style={{
-                      padding: '14px 16px',
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      marginBottom: '16px'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
-                        <label style={{ ...styles.formLabel, marginBottom: 0, fontWeight: 'bold', color: '#1e293b' }}>
-                          담당 감사자 (복수 지정 가능)
-                        </label>
-                        <span style={{ fontSize: '12px', color: '#64748b' }}>
-                          ※ 로그인 감사자가 기본 포함되며, 감사팀 인원을 자유롭게 추가/제거할 수 있습니다.
-                        </span>
-                      </div>
-
-                      {/* 선택된 담당 감사자 뱃지 리스트 */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px', minHeight: '32px', alignItems: 'center' }}>
-                        {selectedAuditors.length === 0 ? (
-                          <span style={{ fontSize: '12px', color: '#94a3b8' }}>지정된 담당 감사자가 없습니다. 아래에서 감사자를 추가하세요.</span>
-                        ) : (
-                          selectedAuditors.map(audId => {
-                            const uInfo = usersList.find(u => u.username === audId);
-                            const displayName = uInfo ? `${uInfo.name} (${audId})` : audId;
-                            const deptText = uInfo?.deptName ? ` - ${uInfo.deptName}` : '';
-                            const isMe = user?.username === audId;
-                            return (
-                              <span
-                                key={audId}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '6px',
-                                  padding: '5px 12px',
-                                  backgroundColor: isMe ? '#e0f2fe' : '#f1f5f9',
-                                  border: isMe ? '1.5px solid #0284c7' : '1px solid #cbd5e1',
-                                  borderRadius: '20px',
-                                  fontSize: '12px',
-                                  color: isMe ? '#0369a1' : '#334155',
-                                  fontWeight: isMe ? 'bold' : '500',
-                                }}
-                              >
-                                <span>{isMe ? '[본인] ' : ''}{displayName}{deptText}</span>
-                                {(!selectedCapId || canEditCurrentCap) && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveAuditor(audId)}
-                                    style={{
-                                      background: 'none',
-                                      border: 'none',
-                                      color: '#ef4444',
-                                      cursor: 'pointer',
-                                      fontWeight: 'bold',
-                                      padding: '0 2px',
-                                      fontSize: '13px',
-                                      lineHeight: 1
-                                    }}
-                                    title="감사자 제거"
-                                  >
-                                    ✕
-                                  </button>
-                                )}
-                              </span>
-                            );
-                          })
-                        )}
-                      </div>
-
-                      {/* 감사자 추가 드롭다운 */}
-                      {(!selectedCapId || canEditCurrentCap) && (
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', maxWidth: '380px' }}>
-                          <select
-                            defaultValue=""
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                handleAddAuditor(e.target.value);
-                                e.target.value = '';
-                              }
-                            }}
-                            style={{ ...styles.select, fontSize: '13px', padding: '6px 10px' }}
-                          >
-                            <option value="">담당 감사자 추가 선택...</option>
-                            {auditUsers
-                              .filter(u => !selectedAuditors.includes(u.username))
-                              .map(u => (
-                                <option key={u.username} value={u.username}>
-                                  {u.name} (ID: {u.username}) {u.deptName ? `[${u.deptName}]` : '[감사팀]'}
-                                </option>
-                              ))}
-                          </select>
-                        </div>
-                      )}
-                    </div>
 
                     {/* 3) CAP 달성 대상자 복수 지정 (상시 추가/제거 지원) */}
                     <div style={{
@@ -3959,15 +3963,7 @@ const Dashboard = () => {
                           <span style={{ fontSize: '12px', fontWeight: 'bold', backgroundColor: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '12px', border: '1px solid #86efac' }}>
                             {selectedAssignedUsers.length}명 지정됨
                           </span>
-                          {isAuditTeam && (
-                            <span style={{ fontSize: '11px', backgroundColor: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 'bold' }}>
-                              감사팀 상시 추가·수정 가능
-                            </span>
-                          )}
                         </div>
-                        <span style={{ fontSize: '12px', color: '#15803d', fontWeight: '500' }}>
-                          ※ 지적사항 조치를 책임질 피감법인 담당자를 복수로 지정할 수 있으며 상시 추가·삭제 가능합니다.
-                        </span>
                       </div>
 
                       {/* 선택된 CAP 달성 대상자 태그 뱃지 리스트 */}
@@ -4031,114 +4027,66 @@ const Dashboard = () => {
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1'
                         }}>
-                          {/* 1단계: 소속 부서 선택 */}
+                          {/* 1단계: 소속 부서 선택 (직접입력란 삭제) */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 240px' }}>
                             <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#166534', marginBottom: 0 }}>
                               1단계: 소속 부서 선택
                             </label>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              <select
-                                value={targetCorpDepts.includes(assignedDeptSelect) ? assignedDeptSelect : (assignedDeptSelect ? '__DIRECT__' : '')}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val === '__DIRECT__') {
-                                    setAssignedDeptSelect('');
-                                  } else {
-                                    setAssignedDeptSelect(val);
-                                    setCustomAssignedDeptInput('');
-                                  }
-                                }}
-                                style={{ ...styles.select, flex: 1, fontSize: '12px', padding: '6px 8px', borderColor: '#86efac' }}
-                              >
-                                <option value="">-- 부서 선택 ({targetCorpDepts.length}개) --</option>
-                                {targetCorpDepts.map(d => (
-                                  <option key={d} value={d}>
-                                    {d} ({targetCorpUsers.filter(u => u.deptName === d).length}명)
-                                  </option>
-                                ))}
-                                <option value="__DIRECT__">직접 부서 입력...</option>
-                              </select>
-                              {(!targetCorpDepts.includes(assignedDeptSelect) || assignedDeptSelect === '') && (
-                                <input
-                                  type="text"
-                                  placeholder="부서명 직접입력"
-                                  value={customAssignedDeptInput}
-                                  onChange={(e) => {
-                                    setCustomAssignedDeptInput(e.target.value);
-                                    setAssignedDeptSelect(e.target.value);
-                                  }}
-                                  style={{ ...styles.input, width: '120px', fontSize: '12px', padding: '6px 8px', borderColor: '#86efac' }}
-                                />
-                              )}
-                            </div>
+                            <select
+                              value={assignedDeptSelect}
+                              onChange={(e) => {
+                                setAssignedDeptSelect(e.target.value);
+                                setAssignedUserSelect(''); // 부서 변경 시 담당자 선택 초기화
+                              }}
+                              style={{ ...styles.select, fontSize: '12px', padding: '6px 8px', borderColor: '#86efac' }}
+                            >
+                              <option value="">-- 부서 선택 ({targetCorpDepts.length}개) --</option>
+                              {targetCorpDepts.map(d => (
+                                <option key={d} value={d}>
+                                  {d} ({targetCorpUsers.filter(u => u.deptName === d).length}명)
+                                </option>
+                              ))}
+                            </select>
                           </div>
 
-                          {/* 2단계: 담당자 선택 */}
+                          {/* 2단계: 담당자 선택 (선택된 부서 소속 직원만 표시) */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 280px' }}>
                             <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#166534', marginBottom: 0 }}>
                               2단계: 담당자 선택
                             </label>
                             {(() => {
-                              const curDept = assignedDeptSelect || customAssignedDeptInput;
-                              const deptUsers = curDept
-                                ? targetCorpUsers.filter(u => u.deptName === curDept)
+                              const deptUsers = assignedDeptSelect
+                                ? targetCorpUsers.filter(u => u.deptName === assignedDeptSelect)
                                 : [];
-                              const otherCorpUsers = curDept
-                                ? targetCorpUsers.filter(u => u.deptName !== curDept)
-                                : targetCorpUsers;
 
                               return (
-                                <div style={{ display: 'flex', gap: '4px' }}>
-                                  <select
-                                    value={assignedUserSelect}
-                                    onChange={(e) => {
-                                      const val = e.target.value;
-                                      setAssignedUserSelect(val);
-                                      if (val) {
-                                        const found = usersList.find(u => u.username === val);
-                                        if (found && found.deptName && !curDept) {
-                                          setAssignedDeptSelect(found.deptName);
-                                        }
-                                      }
-                                    }}
-                                    style={{ ...styles.select, flex: 1, fontSize: '12px', padding: '6px 8px', borderColor: '#86efac' }}
-                                  >
-                                    <option value="">-- 담당자 선택 --</option>
-                                    {deptUsers.length > 0 && (
-                                      <optgroup label={`[${curDept}] 소속 인원`}>
-                                        {deptUsers.map(u => (
-                                          <option key={u.username} value={u.username}>
-                                            {u.name} (사번: {u.username}) [{u.deptName}] - {getRoleKoreanName(u.role)}
-                                          </option>
-                                        ))}
-                                      </optgroup>
-                                    )}
-                                    <optgroup label="기타 전체 임직원 목록">
-                                      {otherCorpUsers.map(u => (
+                                <select
+                                  value={assignedUserSelect}
+                                  onChange={(e) => setAssignedUserSelect(e.target.value)}
+                                  disabled={!assignedDeptSelect}
+                                  style={{
+                                    ...styles.select,
+                                    fontSize: '12px',
+                                    padding: '6px 8px',
+                                    borderColor: '#86efac',
+                                    backgroundColor: assignedDeptSelect ? '#ffffff' : '#f1f5f9'
+                                  }}
+                                >
+                                  {!assignedDeptSelect ? (
+                                    <option value="">-- 먼저 1단계 부서를 선택해 주세요 --</option>
+                                  ) : deptUsers.length === 0 ? (
+                                    <option value="">해당 부서에 등록된 직원이 없습니다</option>
+                                  ) : (
+                                    <>
+                                      <option value="">-- [{assignedDeptSelect}] 담당자 선택 ({deptUsers.length}명) --</option>
+                                      {deptUsers.map(u => (
                                         <option key={u.username} value={u.username}>
-                                          {u.name} (사번: {u.username}) [{u.deptName || '부서미지정'}] - {getRoleKoreanName(u.role)}
+                                          {u.name} (사번: {u.username}) - {getRoleKoreanName(u.role)}
                                         </option>
                                       ))}
-                                    </optgroup>
-                                  </select>
-                                  <input
-                                    type="text"
-                                    placeholder="사번/성명 직접입력"
-                                    value={customAssignedUserInput}
-                                    onChange={(e) => setCustomAssignedUserInput(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        const targetId = assignedUserSelect || customAssignedUserInput.trim();
-                                        const targetDept = assignedDeptSelect || customAssignedDeptInput.trim();
-                                        if (targetId) {
-                                          handleAddAssignedUser(targetId, targetDept, customAssignedUserInput.trim());
-                                        }
-                                      }
-                                    }}
-                                    style={{ ...styles.input, width: '130px', fontSize: '12px', padding: '6px 8px' }}
-                                  />
-                                </div>
+                                    </>
+                                  )}
+                                </select>
                               );
                             })()}
                           </div>
@@ -4148,14 +4096,17 @@ const Dashboard = () => {
                             <button
                               type="button"
                               onClick={() => {
-                                const targetId = assignedUserSelect || customAssignedUserInput.trim();
-                                const targetDept = assignedDeptSelect || customAssignedDeptInput.trim();
-                                if (!targetId) {
-                                  setError('추가할 대상자(사번 또는 성명)를 선택하거나 직접 입력해 주세요.');
+                                if (!assignedDeptSelect) {
+                                  setError('소속 부서를 먼저 선택해 주세요.');
                                   setTimeout(() => setError(''), 3000);
                                   return;
                                 }
-                                handleAddAssignedUser(targetId, targetDept, customAssignedUserInput.trim());
+                                if (!assignedUserSelect) {
+                                  setError('담당자를 선택해 주세요.');
+                                  setTimeout(() => setError(''), 3000);
+                                  return;
+                                }
+                                handleAddAssignedUser(assignedUserSelect, assignedDeptSelect, '');
                               }}
                               style={{
                                 padding: '6px 14px',
@@ -4192,11 +4143,6 @@ const Dashboard = () => {
                           <span style={{ fontSize: '12px', fontWeight: 'bold', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '12px', border: '1px solid #7dd3fc' }}>
                             {selectedRelatedMembers.length}곳 지정됨
                           </span>
-                          {isAuditTeam && (
-                            <span style={{ fontSize: '11px', backgroundColor: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 'bold' }}>
-                              감사팀 상시 추가·수정 가능
-                            </span>
-                          )}
                         </div>
                         <span style={{ fontSize: '12px', color: '#0284c7', fontWeight: '500' }}>
                           ※ 지적사항 해결을 위해 협업할 <b>유관부서와 해당 담당자</b>를 함께 지정할 수 있습니다.
@@ -4269,100 +4215,63 @@ const Dashboard = () => {
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1'
                         }}>
-                          {/* 1단계: 유관부서 선택 또는 직접 입력 */}
+                          {/* 1단계: 유관부서 선택 (직접입력란 삭제) */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 240px' }}>
                             <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0369a1', marginBottom: 0 }}>
                               1단계: 유관부서 선택
                             </label>
-                            <div style={{ display: 'flex', gap: '4px' }}>
-                              <select
-                                value={relatedDeptSelect}
-                                onChange={(e) => {
-                                  setRelatedDeptSelect(e.target.value);
-                                  if (e.target.value) setCustomRelatedDeptInput('');
-                                }}
-                                style={{ ...styles.select, flex: 1, fontSize: '12px', padding: '6px 8px' }}
-                              >
-                                <option value="">-- 유관부서 드롭다운 선택 --</option>
-                                {targetCorpDepts
-                                  .map(d => (
-                                    <option key={d} value={d}>{d}</option>
-                                  ))}
-                              </select>
-                              <input
-                                type="text"
-                                placeholder="직접 부서명 입력"
-                                value={customRelatedDeptInput}
-                                onChange={(e) => {
-                                  setCustomRelatedDeptInput(e.target.value);
-                                  if (e.target.value) setRelatedDeptSelect('');
-                                }}
-                                style={{ ...styles.input, width: '130px', fontSize: '12px', padding: '6px 8px' }}
-                              />
-                            </div>
+                            <select
+                              value={relatedDeptSelect}
+                              onChange={(e) => {
+                                setRelatedDeptSelect(e.target.value);
+                                setRelatedUserSelect(''); // 부서 변경 시 협조 담당자 초기화
+                              }}
+                              style={{ ...styles.select, fontSize: '12px', padding: '6px 8px' }}
+                            >
+                              <option value="">-- 유관부서 드롭다운 선택 ({targetCorpDepts.length}개) --</option>
+                              {targetCorpDepts.map(d => (
+                                <option key={d} value={d}>{d}</option>
+                              ))}
+                            </select>
                           </div>
 
-                          {/* 2단계: 유관부서 협조 담당자 선택 또는 직접 입력 */}
+                          {/* 2단계: 유관부서 협조 담당자 선택 (선택된 부서 소속 직원만 표시) */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 280px' }}>
                             <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0369a1', marginBottom: 0 }}>
                               2단계: 협조 담당자 선택 (필수)
                             </label>
                             {(() => {
-                              const activeDept = relatedDeptSelect || customRelatedDeptInput.trim();
-                              const deptUsers = activeDept
-                                ? usersList.filter(u => u.deptName === activeDept)
+                              const deptUsers = relatedDeptSelect
+                                ? usersList.filter(u => u.deptName === relatedDeptSelect)
                                 : [];
-                              const allOtherUsers = activeDept
-                                ? usersList.filter(u => u.deptName !== activeDept)
-                                : usersList;
 
                               return (
-                                <div style={{ display: 'flex', gap: '4px' }}>
-                                  <select
-                                    value={relatedUserSelect}
-                                    onChange={(e) => {
-                                      setRelatedUserSelect(e.target.value);
-                                      if (e.target.value) setCustomRelatedUserInput('');
-                                    }}
-                                    style={{ ...styles.select, flex: 1, fontSize: '12px', padding: '6px 8px' }}
-                                  >
-                                    <option value="">-- 협조 담당자 선택 --</option>
-                                    {deptUsers.length > 0 && (
-                                      <optgroup label={`[${activeDept}] 소속 인원`}>
-                                        {deptUsers.map(u => (
-                                          <option key={u.username} value={u.username}>
-                                            {u.name} (사번: {u.username}) [{u.deptName}]
-                                          </option>
-                                        ))}
-                                      </optgroup>
-                                    )}
-                                    <optgroup label="기타 전체 임직원 목록">
-                                      {allOtherUsers.map(u => (
+                                <select
+                                  value={relatedUserSelect}
+                                  onChange={(e) => setRelatedUserSelect(e.target.value)}
+                                  disabled={!relatedDeptSelect}
+                                  style={{
+                                    ...styles.select,
+                                    fontSize: '12px',
+                                    padding: '6px 8px',
+                                    backgroundColor: relatedDeptSelect ? '#ffffff' : '#f1f5f9'
+                                  }}
+                                >
+                                  {!relatedDeptSelect ? (
+                                    <option value="">-- 먼저 1단계 유관부서를 선택해 주세요 --</option>
+                                  ) : deptUsers.length === 0 ? (
+                                    <option value="">해당 부서에 등록된 직원이 없습니다</option>
+                                  ) : (
+                                    <>
+                                      <option value="">-- [{relatedDeptSelect}] 협조 담당자 선택 ({deptUsers.length}명) --</option>
+                                      {deptUsers.map(u => (
                                         <option key={u.username} value={u.username}>
-                                          {u.name} (사번: {u.username}) [{u.deptName || '부서미지정'}]
+                                          {u.name} (사번: {u.username})
                                         </option>
                                       ))}
-                                    </optgroup>
-                                  </select>
-                                  <input
-                                    type="text"
-                                    placeholder="성명/사번 직접입력"
-                                    value={customRelatedUserInput}
-                                    onChange={(e) => {
-                                      setCustomRelatedUserInput(e.target.value);
-                                      if (e.target.value) setRelatedUserSelect('');
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        const finalDept = relatedDeptSelect || customRelatedDeptInput.trim();
-                                        const finalUser = relatedUserSelect || customRelatedUserInput.trim();
-                                        handleAddRelatedMember(finalDept, finalUser, customRelatedUserInput.trim());
-                                      }
-                                    }}
-                                    style={{ ...styles.input, width: '130px', fontSize: '12px', padding: '6px 8px' }}
-                                  />
-                                </div>
+                                    </>
+                                  )}
+                                </select>
                               );
                             })()}
                           </div>
@@ -4372,19 +4281,17 @@ const Dashboard = () => {
                             <button
                               type="button"
                               onClick={() => {
-                                const finalDept = relatedDeptSelect || customRelatedDeptInput.trim();
-                                const finalUser = relatedUserSelect || customRelatedUserInput.trim();
-                                if (!finalDept) {
-                                  setError('유관부서를 선택하거나 직접 입력해 주세요.');
+                                if (!relatedDeptSelect) {
+                                  setError('유관부서를 먼저 선택해 주세요.');
                                   setTimeout(() => setError(''), 3000);
                                   return;
                                 }
-                                if (!finalUser) {
-                                  setError('유관부서의 담당자를 선택하거나 직접 성명/사번을 입력해 주세요.');
+                                if (!relatedUserSelect) {
+                                  setError('유관부서의 협조 담당자를 선택해 주세요.');
                                   setTimeout(() => setError(''), 3000);
                                   return;
                                 }
-                                handleAddRelatedMember(finalDept, finalUser, customRelatedUserInput.trim());
+                                handleAddRelatedMember(relatedDeptSelect, relatedUserSelect, '');
                               }}
                               style={{
                                 padding: '6px 14px',
@@ -4446,21 +4353,22 @@ const Dashboard = () => {
                       {selectedCapId ? (
                         canEditCurrentCap ? (
                           <button type="submit" style={{ ...styles.primaryBtn, backgroundColor: 'var(--saea-blue, #0077C8)' }}>
-                            선택된 지적사항 (CAP #{selectedCapId}) 수정 내용 저장
+                            선택된 지적사항 (CAP #{selectedCapDisplayNum}) 수정 내용 저장
                           </button>
                         ) : isAuditTeam ? (
                           <button type="submit" style={{ ...styles.primaryBtn, backgroundColor: '#059669' }}>
-                            지적사항 (CAP #{selectedCapId}) 담당자 및 유관부서 변경 저장
+                            지적사항 (CAP #{selectedCapDisplayNum}) 담당자 및 유관부서 변경 저장
                           </button>
                         ) : null
                       ) : (
-                        <button type="submit" style={styles.primaryBtn}>
-                          신규 지적사항 등록
+                        <button type="submit" style={{ ...styles.primaryBtn, backgroundColor: '#16a34a' }}>
+                          CAP #{nextCapDisplayNum} 신규 지적사항 등록 저장
                         </button>
                       )}
                     </div>
                   </form>
                 </div>
+              )}
 
                 {/* 카테고리 관리 모달 팝업 (선명한 배경과 고대비 음영 적용) */}
                 {categoryModalOpen && (
