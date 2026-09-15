@@ -12,55 +12,47 @@ pipeline {
     stages {
         stage('1. Checkout Code') {
             steps {
-                // Git 퍼블릭 저장소 체크아웃
+                echo 'Git 저장소에서 최신 소스코드를 체크아웃합니다...'
                 checkout scm
             }
         }
 
-        stage('2. Build Frontend (React / Vite)') {
+        stage('2. Deploy to Ubuntu Server via SSH') {
             steps {
-                echo 'Building Frontend React application...'
-                dir('frontend') {
-                    sh 'npm install'
-                    sh 'npm run build'
-                }
-            }
-        }
-
-        stage('3. Build Backend (Spring Boot)') {
-            steps {
-                echo 'Packaging Spring Boot Backend...'
-                dir('backend') {
-                    sh 'mvn clean package -DskipTests'
-                }
-            }
-        }
-
-        stage('4. Deploy to Ubuntu Server via SSH') {
-            steps {
-                echo 'Deploying to Ubuntu Docker Server...'
-                // Jenkins Credentials에 등록된 SSH 키 ID (UBUNTU_SERVER_SSH) 사용
+                echo '운영 서버(10.40.0.193)로 소스 동기화 및 Docker Compose 빌드/배포를 실행합니다...'
+                // Jenkins Credentials에 등록된 기존 SSH 키 (operating-server-ssh) 사용
                 sshagent(['operating-server-ssh']) {
-                    // 1) 서버 디렉토리 생성 (/opt/auditcap 및 /data/auditcap)
+                    // 1) 서버 디렉토리 준비 (/opt/auditcap 및 증빙 파일 보관용 /data/auditcap)
                     sh """
                     ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} '
-                        mkdir -p ${DEPLOY_PATH}/backend ${DEPLOY_PATH}/frontend ${DATA_PATH}
+                        mkdir -p ${DEPLOY_PATH} ${DATA_PATH}
                     '
                     """
 
-                    // 2) 빌드 산출물 및 Docker 설정 파일 전송
-                    sh "scp -o StrictHostKeyChecking=no backend/target/*.jar ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/backend/app.jar"
-                    sh "scp -o StrictHostKeyChecking=no backend/Dockerfile ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/backend/"
-                    sh "scp -r -o StrictHostKeyChecking=no frontend/dist ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/frontend/"
-                    sh "scp -o StrictHostKeyChecking=no frontend/Dockerfile frontend/nginx.conf ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/frontend/"
-                    sh "scp -o StrictHostKeyChecking=no docker-compose.yml ${SSH_USER}@${SSH_HOST}:${DEPLOY_PATH}/"
+                    // 2) 소스 파일 고속 전송 (대용량 캐시 및 원격 .env 보존)
+                    // Jenkins 로컬 환경에 node, maven이 없어도 Docker Multi-stage 빌드로 원격 서버에서 자동 빌드됨
+                    sh """
+                    tar --exclude='.git' \
+                        --exclude='node_modules' \
+                        --exclude='target' \
+                        --exclude='dist' \
+                        --exclude='.env' \
+                        -czf - . | ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} 'tar -xzf - -C ${DEPLOY_PATH}'
+                    """
 
-                    // 3) 원격 서버의 기존 .env 파일을 참조하여 도커 재빌드 및 실행
+                    // 3) 원격 서버에서 기존 .env 참조하여 Docker 컨테이너 격리 빌드 및 백그라운드 실행
                     sh """
                     ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} '
                         cd ${DEPLOY_PATH}
-                        docker compose -p auditcap down
-                        docker compose -p auditcap up -d --build
+                        docker compose -p auditcap up -d --build --remove-orphans
+                    '
+                    """
+
+                    // 4) 배포 상태 확인
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} '
+                        cd ${DEPLOY_PATH}
+                        docker compose -p auditcap ps
                     '
                     """
                 }
@@ -71,12 +63,13 @@ pipeline {
     post {
         success {
             echo '==============================================='
-            echo ' 배포가 성공적으로 완료되었습니다.'
+            echo ' [성공] 감사 모니터링 시스템(CAP) 배포가 완료되었습니다!'
+            echo " 서비스 도메인: https://auditcap.sae-a.com"
             echo '==============================================='
         }
         failure {
             echo '==============================================='
-            echo ' 배포 중 오류가 발생했습니다. 로그를 확인하세요.'
+            echo ' [실패] 배포 중 오류가 발생했습니다. Jenkins 콘솔 로그를 확인하세요.'
             echo '==============================================='
         }
     }
