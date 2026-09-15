@@ -1,0 +1,46 @@
+# ==========================================
+# 민감 정보 및 사내 문서 차단
+# ==========================================
+*.pptx
+*.ppt
+*.xlsx
+*.xls
+*.docx
+*.doc
+*.txt
+*.pem
+*.key
+.env
+.env.*
+application-secret.yml
+application-prod.yml
+
+# 업로드 파일 스토리지 디렉토리
+cap_uploads/
+uploads/
+*.log
+
+# ==========================================
+# 백엔드 빌드 산출물 (Java / Maven)
+# ==========================================
+backend/target/
+backend/.mvn/
+backend/*.jar
+backend/*.war
+
+# ==========================================
+# 프론트엔드 빌드 산출물 (Node / React / Vite)
+# ==========================================
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+
+# ==========================================
+# IDE 및 OS 임시 파일
+# ==========================================
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

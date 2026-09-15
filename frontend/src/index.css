@@ -1,0 +1,132 @@
+:root {
+  /* GLOBAL SAE-A Brand Guideline Colors */
+  --saea-blue: #0077C8;         /* Pantone 3005 C Primary */
+  --saea-blue-hover: #005fa0;   /* Interactive Hover */
+  --saea-blue-active: #004d80;  /* Active State */
+  --saea-blue-light: #f0f7fc;   /* Soft Tint */
+  --saea-blue-badge: #e1effa;   /* Badge Background */
+
+  --saea-gray: #C8C9C7;         /* Pantone Cool Gray 3 C */
+  --saea-silver: #8A8D8F;       /* Pantone 877 C */
+  --saea-gold: #847453;         /* Pantone 872 C */
+
+  /* Neutral UI Grays */
+  --saea-slate-900: #0f172a;
+  --saea-slate-800: #1e293b;
+  --saea-slate-700: #334155;
+  --saea-slate-600: #475569;
+  --saea-slate-500: #64748b;
+  --saea-slate-300: #cbd5e1;
+  --saea-slate-200: #e2e8f0;
+  --saea-slate-100: #f1f5f9;
+  --saea-slate-50:  #f8fafc;
+  --saea-white:     #ffffff;
+
+  /* Typography Settings */
+  --saea-font-main: 'SUIT', 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  font-family: var(--saea-font-main);
+  letter-spacing: -0.02em; /* 국문 자간 규정: -30 ~ 0 */
+  color: var(--saea-slate-800);
+  background-color: #f8fafc;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input, button, select, textarea {
+  font-family: inherit;
+  letter-spacing: inherit;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--saea-silver);
+}
+
+/* 사이드바 LNB 대메뉴 (감사업무관리, 시스템관리) 카테고리 헤더 스타일 */
+.saea-nav-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 8px 8px 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+  background-color: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  margin-bottom: 6px;
+}
+
+.saea-nav-group-header:hover {
+  color: #ffffff;
+  border-bottom-color: rgba(0, 119, 200, 0.6);
+}
+
+.saea-nav-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.01em;
+}
+
+.saea-nav-group-title::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 13px;
+  background-color: var(--saea-blue, #0077C8);
+  border-radius: 2px;
+}
+
+.saea-nav-group-chevron {
+  font-size: 10px;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+
+/* 하위 메뉴 리스트 계층 트리 (확실한 들여쓰기 및 가이드 라인) */
+.saea-sub-menu-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-left: 8px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.saea-sub-menu-item {
+  transition: all 0.15s ease;
+}
+
+.saea-sub-menu-item:hover {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}

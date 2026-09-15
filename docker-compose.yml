@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: saea-audit-backend
+    restart: always
+    environment:
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - APP_UPLOAD_PATH=/app/uploads
+      - SPRING_JPA_SHOW_SQL=false
+    volumes:
+      # 호스트 서버(/data/auditcap)에 증빙자료 파일을 영구 보존하기 위한 볼륨 마운트
+      - /data/auditcap:/app/uploads
+    networks:
+      - audit-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: saea-audit-frontend
+    restart: always
+    ports:
+      # 외부 접속 포트:내부 Nginx 포트 (필요 시 외부 포트 8080 등으로 변경 가능)
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - audit-net
+
+networks:
+  audit-net:
+    driver: bridge

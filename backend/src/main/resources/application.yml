@@ -1,0 +1,44 @@
+server:
+  port: ${SERVER_PORT:8788}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+  
+  jpa:
+    database-platform: org.hibernate.dialect.SQLServer2012Dialect # MS SQL Server 2014에 적합한 Dialect 설정
+    hibernate:
+      ddl-auto: none # 수동 스키마 스크립트(schema.sql) 적용에 따라 자동 DDL 비활성화
+    show-sql: ${SPRING_JPA_SHOW_SQL:true}
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB # 50MB 제한 명세 준수
+      max-request-size: 50MB
+
+# Application Custom Configurations
+app:
+  jwt:
+    # 256-bit secret key (Base64 encoded or plain text with enough length)
+    secret: ${JWT_SECRET}
+    # 1차 로그인 후 MFA 인증 대기를 위한 임시 토큰 만료 시간 (5분)
+    temp-expiration-ms: 300000
+    # MFA 최종 인증 완료 후 발급되는 토큰 만료 시간 (8시간)
+    expiration-ms: 28800000
+  
+  otp:
+    issuer: GLOBAL_SAEA_CAP
+  
+  upload:
+    # 운영 환경에서는 Docker 마운트 경로(/app/uploads), 로컬에서는 기존 경로를 기본값으로 사용
+    local-path: ${APP_UPLOAD_PATH:e:/Vibe/Audit/cap_uploads}
+    # 차단할 확장자 리스트
+    blocked-extensions: exe,bat
