@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: saea-audit-backend
+    container_name: auditcap-backend
     restart: always
     environment:
       - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
@@ -18,22 +16,22 @@ services:
       # 호스트 서버(/data/auditcap)에 증빙자료 파일을 영구 보존하기 위한 볼륨 마운트
       - /data/auditcap:/app/uploads
     networks:
-      - audit-net
+      - auditcap-net
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: saea-audit-frontend
+    container_name: auditcap-frontend
     restart: always
     ports:
-      # 외부 접속 포트:내부 Nginx 포트 (필요 시 외부 포트 8080 등으로 변경 가능)
-      - "80:80"
+      # 기존 운영 중인 다른 Docker 컨테이너와의 포트 충돌 방지 (기본 8787 포트, 필요시 .env의 WEB_PORT로 변경 가능)
+      - "${WEB_PORT:-8787}:80"
     depends_on:
       - backend
     networks:
-      - audit-net
+      - auditcap-net
 
 networks:
-  audit-net:
+  auditcap-net:
     driver: bridge

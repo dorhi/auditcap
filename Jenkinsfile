@@ -71,9 +71,10 @@ SPRING_DATASOURCE_USERNAME=${DB_USER}
 SPRING_DATASOURCE_PASSWORD=${DB_PASS}
 JWT_SECRET=${JWT_SEC}
 APP_UPLOAD_PATH=/app/uploads
+WEB_PORT=8787
 EOF
-                            docker compose down
-                            docker compose up -d --build
+                            docker compose -p auditcap down
+                            docker compose -p auditcap up -d --build
                         '
                         """
                     }
