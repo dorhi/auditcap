@@ -1,6 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
+// Axios 요청 인터셉터: 모든 API 호출 시 localStorage의 최신 JWT 토큰을 자동으로 헤더에 첨부
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token') || localStorage.getItem('temp_token');
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return config;
+}, (error) => Promise.reject(error));
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {

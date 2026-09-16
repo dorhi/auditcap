@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthProvider';
 import axios from 'axios';
 import MenuManagement from './MenuManagement';
@@ -1103,11 +1103,14 @@ const Dashboard = () => {
     setSearchEmpMessage('');
     setSearchEmpResults([]);
     try {
+      const token = localStorage.getItem('access_token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const res = await axios.get('/api/users/search-employee', {
         params: {
           name: query,
           corp: searchEmpCorp === 'ALL' ? '' : searchEmpCorp,
-        }
+        },
+        headers
       });
       const data = res.data || [];
       setSearchEmpResults(data);
@@ -1121,7 +1124,19 @@ const Dashboard = () => {
       }
     } catch (err) {
       console.error('사원 검색 실패:', err);
-      setSearchEmpMessage(err.response?.data?.message || '사원 검색 중 오류가 발생했습니다.');
+      let errorMsg = err.response?.data?.message;
+      if (!errorMsg) {
+        if (err.response?.status === 403) {
+          errorMsg = '사원 검색 권한이 부족합니다. (관리자 권한 확인 필요)';
+        } else if (err.response?.status === 401) {
+          errorMsg = '인증 세션이 만료되었습니다. 다시 로그인해 주세요.';
+        } else if (!err.response) {
+          errorMsg = '백엔드 서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.';
+        } else {
+          errorMsg = `사원 검색 처리 중 오류가 발생했습니다. (${err.response?.status || err.message})`;
+        }
+      }
+      setSearchEmpMessage(errorMsg);
     } finally {
       setSearchEmpLoading(false);
     }
@@ -1544,6 +1559,33 @@ const Dashboard = () => {
     } catch (err) {
       console.error('파일 다운로드 실패:', err);
       alert('파일 다운로드 중 오류가 발생했습니다.');
+    }
+  };
+
+  // [통합 매뉴얼 다운로드] 단일 통합 PPTX 파일 다운로드 핸들러
+  const handleDownloadIntegratedManual = async () => {
+    try {
+      const res = await axios.get('/api/manual/download', {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'SAE-A_CAP_Integrated_Manual.pptx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setMessage('글로벌 세아 CAP 관리 시스템 통합 사용자 매뉴얼(PPT)이 다운로드되었습니다.');
+    } catch (err) {
+      console.warn('API 다운로드 실패 시 정적 파일 fallback 다운로드 시도');
+      const link = document.createElement('a');
+      link.href = '/manuals/SAE-A_CAP_Integrated_Manual.pptx';
+      link.setAttribute('download', 'SAE-A_CAP_Integrated_Manual.pptx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setMessage('글로벌 세아 CAP 관리 시스템 통합 사용자 매뉴얼(PPT)이 다운로드되었습니다.');
     }
   };
 
@@ -1992,7 +2034,36 @@ const Dashboard = () => {
               return '화면 뷰어';
             })()}
           </h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={handleDownloadIntegratedManual}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: '#ffffff',
+                color: '#0077C8',
+                border: '1.5px solid #0077C8',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontSize: '12.5px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px rgba(0, 119, 200, 0.15)',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f0f7ff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#ffffff';
+              }}
+              title="실무자, 법인대표, 법인장, 감사팀, 관리자 모든 권한의 내용이 포함된 통합 사용자 매뉴얼(PPT)을 하나의 파일로 다운로드합니다."
+            >
+              <span style={{ fontSize: '14px' }}>📥</span>
+              <span>통합 매뉴얼 다운로드 (PPT)</span>
+            </button>
             <div style={styles.topProfile}>
               <span style={styles.topProfileBadge}>{user.corpId} {user.deptName}</span>
               <span style={styles.topProfileName}><strong>{user.name || user.username}</strong> 님 환영합니다</span>

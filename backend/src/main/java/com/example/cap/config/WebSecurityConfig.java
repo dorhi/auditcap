@@ -46,8 +46,8 @@ public class WebSecurityConfig {
             .cors(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // 1차 로그인 및 회원가입은 인증 없이 접근 허용
-                .requestMatchers("/api/auth/login", "/api/auth/signup").permitAll()
+                // 1차 로그인 및 회원가입, 매뉴얼 다운로드는 인증 없이 접근 허용
+                .requestMatchers("/api/auth/login", "/api/auth/signup", "/api/manual/**").permitAll()
                 // OTP 설정 및 검증은 1차 로그인 성공 후 발급된 임시 토큰(MFA 미완료) 상태에서 통과해야 하므로 permitAll이 아님 (Filter 내부에서 통과 처리됨)
                 .requestMatchers("/api/auth/mfa/setup", "/api/auth/mfa/verify").authenticated()
                 // 그 외 모든 API 요청은 최종 2FA 인증(MFA 완료)을 요구

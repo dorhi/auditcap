@@ -12,6 +12,7 @@
 *.key
 .env
 .env.*
+*.md
 application-secret.yml
 application-prod.yml
 

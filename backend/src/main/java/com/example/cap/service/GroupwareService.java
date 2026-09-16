@@ -1,46 +1,81 @@
 package com.example.cap.service;
 
 import com.example.cap.dto.GroupwareUserDto;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
+import com.example.cap.entity.User;
+import com.example.cap.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.*;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GroupwareService {
 
-    private final EntityManager entityManager;
+    private final DataSource dataSource;
+    private final UserRepository userRepository;
 
     public GroupwareUserDto findGroupwareUser(String memberId) {
-        String sql = "SELECT MEMBERID, Passwd, MEMBERNAME, MEMBERNAME_KOR, MEMBERNAME_ENG, GROUPNAME, EMAIL, SAEA_CNAME " +
-                     "FROM COOLWARE.dbo.CD_MEMBER_V_GW " +
-                     "WHERE MEMBERID = :memberId";
-        
-        Query query = entityManager.createNativeQuery(sql);
-        query.setParameter("memberId", memberId);
-        
-        @SuppressWarnings("unchecked")
-        List<Object[]> results = query.getResultList();
-        
-        if (results == null || results.isEmpty()) {
+        if (memberId == null || memberId.trim().isEmpty()) {
             return null;
         }
-        
-        Object[] row = results.get(0);
-        GroupwareUserDto dto = new GroupwareUserDto();
-        dto.setMemberId(row[0] != null ? row[0].toString() : null);
-        dto.setPasswd(row[1] != null ? row[1].toString() : null);
-        dto.setMemberName(row[2] != null ? row[2].toString() : null);
-        dto.setMemberNameKor(row[3] != null ? row[3].toString() : null);
-        dto.setMemberNameEng(row[4] != null ? row[4].toString() : null);
-        dto.setGroupName(row[5] != null ? row[5].toString() : null);
-        dto.setEmail(row[6] != null ? row[6].toString() : null);
-        dto.setCorpName(row[7] != null ? row[7].toString() : null);
-        
-        return dto;
+
+        String searchId = memberId.trim();
+
+        // 1. CD_MEMBER_V_GW 뷰에서 조회
+        try (Connection conn = dataSource.getConnection()) {
+            String sql = "SELECT MEMBERID, Passwd, MEMBERNAME, MEMBERNAME_KOR, MEMBERNAME_ENG, GROUPNAME, EMAIL, SAEA_CNAME " +
+                         "FROM COOLWARE.dbo.CD_MEMBER_V_GW " +
+                         "WHERE MEMBERID = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, searchId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        GroupwareUserDto dto = new GroupwareUserDto();
+                        dto.setMemberId(rs.getString("MEMBERID"));
+                        dto.setPasswd(rs.getString("Passwd"));
+                        dto.setMemberName(rs.getString("MEMBERNAME"));
+                        dto.setMemberNameKor(rs.getString("MEMBERNAME_KOR"));
+                        dto.setMemberNameEng(rs.getString("MEMBERNAME_ENG"));
+                        dto.setGroupName(rs.getString("GROUPNAME"));
+                        dto.setEmail(rs.getString("EMAIL"));
+                        dto.setCorpName(rs.getString("SAEA_CNAME"));
+                        return dto;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("CD_MEMBER_V_GW 단일 사원 조회 실패 (ID: {}): {}", searchId, e.getMessage());
+        }
+
+        // 2. 로컬 DB(CAPS_USERS)에서 보완 조회
+        try {
+            Optional<User> localUser = userRepository.findByUsername(searchId);
+            if (localUser.isPresent()) {
+                User u = localUser.get();
+                GroupwareUserDto dto = new GroupwareUserDto();
+                dto.setMemberId(u.getUsername());
+                dto.setPasswd("");
+                dto.setMemberName(u.getName());
+                dto.setMemberNameKor(u.getName());
+                dto.setMemberNameEng("");
+                dto.setGroupName(u.getDeptName() != null ? u.getDeptName() : "현업부서");
+                dto.setEmail(u.getEmail());
+                dto.setCorpName(u.getCorpId() != null ? u.getCorpId() : "글로벌세아");
+                return dto;
+            }
+        } catch (Exception ex) {
+            log.warn("로컬 사용자 조회 실패 (ID: {}): {}", searchId, ex.getMessage());
+        }
+
+        return null;
     }
 
     /**
@@ -49,17 +84,19 @@ public class GroupwareService {
      */
     public List<GroupwareUserDto> searchGroupwareUsers(String name, String corpFilter) {
         if (name == null || name.trim().isEmpty()) {
-            return java.util.Collections.emptyList();
+            return Collections.emptyList();
         }
 
         String searchKeyword = name.trim();
-        List<GroupwareUserDto> userList = new java.util.ArrayList<>();
+        List<GroupwareUserDto> userList = new ArrayList<>();
+        Set<String> seenIds = new HashSet<>();
 
-        try {
+        // 1. CD_MEMBER_V_GW DB 뷰에서 직접 JDBC 조회 (JPA 영속성 컨텍스트 오염 방지)
+        try (Connection conn = dataSource.getConnection()) {
             String sql = "SELECT TOP 50 MEMBERID, Passwd, MEMBERNAME, MEMBERNAME_KOR, MEMBERNAME_ENG, GROUPNAME, EMAIL, SAEA_CNAME " +
                          "FROM COOLWARE.dbo.CD_MEMBER_V_GW " +
-                         "WHERE (MEMBERNAME = :name OR MEMBERNAME_KOR = :name " +
-                         "       OR MEMBERNAME LIKE :likeName OR MEMBERNAME_KOR LIKE :likeName) " +
+                         "WHERE (MEMBERNAME = ? OR MEMBERNAME_KOR = ? " +
+                         "       OR MEMBERNAME LIKE ? OR MEMBERNAME_KOR LIKE ?) " +
                          "ORDER BY " +
                          "  CASE " +
                          "    WHEN SAEA_CNAME LIKE '%글로벌세아%' THEN 1 " +
@@ -68,51 +105,84 @@ public class GroupwareService {
                          "  END, " +
                          "  MEMBERNAME ASC, MEMBERID ASC";
 
-            Query query = entityManager.createNativeQuery(sql);
-            query.setParameter("name", searchKeyword);
-            query.setParameter("likeName", "%" + searchKeyword + "%");
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, searchKeyword);
+                ps.setString(2, searchKeyword);
+                ps.setString(3, "%" + searchKeyword + "%");
+                ps.setString(4, "%" + searchKeyword + "%");
 
-            @SuppressWarnings("unchecked")
-            List<Object[]> results = query.getResultList();
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String memberId = rs.getString("MEMBERID");
+                        if (memberId == null || memberId.trim().isEmpty()) continue;
+                        memberId = memberId.trim();
 
-            if (results != null) {
-                for (Object[] row : results) {
-                    GroupwareUserDto dto = new GroupwareUserDto();
-                    dto.setMemberId(row[0] != null ? row[0].toString() : "");
-                    dto.setPasswd(row[1] != null ? row[1].toString() : "");
-                    dto.setMemberName(row[2] != null ? row[2].toString() : (row[3] != null ? row[3].toString() : ""));
-                    dto.setMemberNameKor(row[3] != null ? row[3].toString() : "");
-                    dto.setMemberNameEng(row[4] != null ? row[4].toString() : "");
-                    dto.setGroupName(row[5] != null ? row[5].toString() : "현업부서");
-                    dto.setEmail(row[6] != null ? row[6].toString() : (dto.getMemberId() + "@sae-a.com"));
-                    
-                    String corp = row[7] != null ? row[7].toString() : "글로벌세아";
-                    dto.setCorpName(corp);
+                        if (!seenIds.add(memberId)) continue;
 
-                    userList.add(dto);
+                        String mName = rs.getString("MEMBERNAME");
+                        String mNameKor = rs.getString("MEMBERNAME_KOR");
+                        String mNameEng = rs.getString("MEMBERNAME_ENG");
+                        String groupName = rs.getString("GROUPNAME");
+                        String email = rs.getString("EMAIL");
+                        String corp = rs.getString("SAEA_CNAME");
+
+                        GroupwareUserDto dto = new GroupwareUserDto();
+                        dto.setMemberId(memberId);
+                        dto.setPasswd(rs.getString("Passwd") != null ? rs.getString("Passwd") : "");
+                        dto.setMemberName(mName != null && !mName.isEmpty() ? mName : (mNameKor != null ? mNameKor : memberId));
+                        dto.setMemberNameKor(mNameKor != null ? mNameKor : "");
+                        dto.setMemberNameEng(mNameEng != null ? mNameEng : "");
+                        dto.setGroupName(groupName != null && !groupName.isEmpty() ? groupName : "현업부서");
+                        dto.setEmail(email != null && !email.isEmpty() ? email : (memberId + "@sae-a.com"));
+                        dto.setCorpName(corp != null && !corp.isEmpty() ? corp : "글로벌세아");
+
+                        userList.add(dto);
+                    }
                 }
             }
         } catch (Exception e) {
-            // DB 뷰 쿼리 실패(테이블 미존재 또는 권한 제한 등) 시 스마트 마스터 풀에서 검색 지원
-            System.err.println("CD_MEMBER_V_GW 쿼리 실패, 내부 마스터 풀 Fallback 적용: " + e.getMessage());
+            log.warn("CD_MEMBER_V_GW 쿼리 실패, 안전 마스터 풀 및 로컬 DB로 자동 대체: {}", e.getMessage());
         }
 
-        // DB 뷰에서 결과가 없거나 예외 발생 시 테스트/운영 연속성을 위한 마스터 풀 보완
-        if (userList.isEmpty()) {
-            List<GroupwareUserDto> fallbackPool = getMasterFallbackPool();
-            for (GroupwareUserDto emp : fallbackPool) {
-                if (emp.getMemberName().contains(searchKeyword) || 
-                    (emp.getMemberNameKor() != null && emp.getMemberNameKor().contains(searchKeyword))) {
-                    userList.add(emp);
+        // 2. 로컬 DB(CAPS_USERS)에서도 이름 매칭 사원 검색 (누락 방지)
+        try {
+            List<User> localUsers = userRepository.findAll();
+            for (User u : localUsers) {
+                if (u.getUsername() == null || !seenIds.add(u.getUsername().trim())) continue;
+                boolean match = (u.getName() != null && u.getName().contains(searchKeyword)) ||
+                                (u.getUsername() != null && u.getUsername().equalsIgnoreCase(searchKeyword));
+                if (match) {
+                    GroupwareUserDto dto = new GroupwareUserDto();
+                    dto.setMemberId(u.getUsername().trim());
+                    dto.setPasswd("");
+                    dto.setMemberName(u.getName() != null ? u.getName() : u.getUsername());
+                    dto.setMemberNameKor(u.getName() != null ? u.getName() : "");
+                    dto.setMemberNameEng("");
+                    dto.setGroupName(u.getDeptName() != null ? u.getDeptName() : "현업부서");
+                    dto.setEmail(u.getEmail() != null ? u.getEmail() : (u.getUsername() + "@sae-a.com"));
+                    dto.setCorpName(u.getCorpId() != null ? u.getCorpId() : "글로벌세아");
+                    userList.add(dto);
                 }
+            }
+        } catch (Exception ex) {
+            log.warn("로컬 사용자 검색 보완 중 예외: {}", ex.getMessage());
+        }
+
+        // 3. 테스트/데모용 Fallback 마스터 풀에서도 매칭 확인
+        List<GroupwareUserDto> fallbackPool = getMasterFallbackPool();
+        for (GroupwareUserDto emp : fallbackPool) {
+            if (emp.getMemberId() == null || !seenIds.add(emp.getMemberId())) continue;
+            if ((emp.getMemberName() != null && emp.getMemberName().contains(searchKeyword)) ||
+                (emp.getMemberNameKor() != null && emp.getMemberNameKor().contains(searchKeyword))) {
+                userList.add(emp);
             }
         }
 
         // 법인 필터가 있는 경우 추가 필터링
-        if (corpFilter != null && !corpFilter.trim().isEmpty() && !corpFilter.equals("ALL")) {
+        if (corpFilter != null && !corpFilter.trim().isEmpty() && !corpFilter.equalsIgnoreCase("ALL")) {
             userList = userList.stream()
                     .filter(u -> u.getCorpName() != null && u.getCorpName().contains(corpFilter.trim()))
-                    .collect(java.util.stream.Collectors.toList());
+                    .collect(Collectors.toList());
         }
 
         return userList;

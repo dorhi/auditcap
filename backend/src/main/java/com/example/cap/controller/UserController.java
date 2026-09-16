@@ -7,6 +7,7 @@ import com.example.cap.service.GroupwareService;
 import com.example.cap.service.UserService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
@@ -41,22 +43,34 @@ public class UserController {
             Map<String, Object> map = new HashMap<>();
             map.put("userId", u.getId() != null ? u.getId().toString() : "");
             map.put("username", u.getUsername());
-
-            String displayName = u.getName();
-            // DB의 name이 없거나 ID와 동일한 경우 그룹웨어 연동 정보에서 성명 보충
-            if (displayName == null || displayName.trim().isEmpty() || displayName.equalsIgnoreCase(u.getUsername())) {
-                try {
-                    GroupwareUserDto gwUser = groupwareService.findGroupwareUser(u.getUsername());
-                    if (gwUser != null && gwUser.getMemberName() != null && !gwUser.getMemberName().trim().isEmpty()) {
-                        displayName = gwUser.getMemberName();
-                    }
-                } catch (Exception ignored) {
-                }
-            }
-
-            map.put("name", displayName != null ? displayName : u.getUsername());
+            map.put("name", u.getName() != null ? u.getName() : u.getUsername());
             map.put("deptName", u.getDeptName());
             map.put("corpId", u.getCorpId());
+            responseList.add(map);
+        }
+        return ResponseEntity.ok(responseList);
+    }
+
+    /**
+     * 회원가입 승인 대기자 목록 조회 API
+     */
+    @GetMapping("/pending")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'AUDIT_LEADER')")
+    public ResponseEntity<?> getPendingUsers() {
+        List<User> users = userService.getAllUsers();
+        List<Map<String, Object>> responseList = new java.util.ArrayList<>();
+        for (User u : users) {
+            if (!"PENDING".equalsIgnoreCase(u.getApprovalStatus())) {
+                continue;
+            }
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", u.getId());
+            map.put("username", u.getUsername());
+            map.put("name", u.getName());
+            map.put("email", u.getEmail());
+            map.put("corpId", u.getCorpId());
+            map.put("deptName", u.getDeptName());
+            map.put("approvalStatus", u.getApprovalStatus());
             map.put("role", u.getRole() != null ? u.getRole().name() : "");
             map.put("enabled", u.getEnabled());
             responseList.add(map);
@@ -68,7 +82,7 @@ public class UserController {
      * 성명으로 글로벌세아 / 세아상역 사원 검색 API (동명이인 구분 지원)
      */
     @GetMapping("/search-employee")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'AUDIT_LEADER', 'AUDITOR')")
     public ResponseEntity<?> searchEmployee(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String corp) {
@@ -76,29 +90,45 @@ public class UserController {
             return ResponseEntity.badRequest().body(Map.of("message", "검색할 사원 이름을 입력해 주세요."));
         }
 
-        List<GroupwareUserDto> employees = groupwareService.searchGroupwareUsers(name.trim(), corp);
+        try {
+            List<GroupwareUserDto> employees = groupwareService.searchGroupwareUsers(name.trim(), corp);
 
-        // 각 직원이 이미 시스템(CAPS_USERS)에 등록되었는지 여부 플래그 포함
-        List<Map<String, Object>> responseList = new java.util.ArrayList<>();
-        for (GroupwareUserDto emp : employees) {
-            boolean alreadyRegistered = userService.existsByUsername(emp.getMemberId());
-            Map<String, Object> map = new HashMap<>();
-            map.put("username", emp.getMemberId());
-            map.put("name", emp.getMemberName());
-            map.put("nameKor", emp.getMemberNameKor());
-            map.put("nameEng", emp.getMemberNameEng());
-            map.put("deptName", emp.getGroupName());
-            map.put("email", emp.getEmail());
-            map.put("corpId", emp.getCorpName());
-            map.put("alreadyRegistered", alreadyRegistered);
-            responseList.add(map);
+            // 각 직원이 이미 시스템(CAPS_USERS)에 등록되었는지 여부 플래그 포함
+            List<Map<String, Object>> responseList = new java.util.ArrayList<>();
+            for (GroupwareUserDto emp : employees) {
+                if (emp == null || emp.getMemberId() == null || emp.getMemberId().trim().isEmpty()) {
+                    continue;
+                }
+                boolean alreadyRegistered = false;
+                try {
+                    alreadyRegistered = userService.existsByUsername(emp.getMemberId().trim());
+                } catch (Exception ex) {
+                    log.warn("사용자 기등록 여부 조회 예외 (무시): {}", ex.getMessage());
+                }
+
+                Map<String, Object> map = new HashMap<>();
+                map.put("username", emp.getMemberId().trim());
+                map.put("name", emp.getMemberName() != null ? emp.getMemberName() : emp.getMemberId());
+                map.put("nameKor", emp.getMemberNameKor() != null ? emp.getMemberNameKor() : emp.getMemberName());
+                map.put("nameEng", emp.getMemberNameEng() != null ? emp.getMemberNameEng() : "");
+                map.put("deptName", emp.getGroupName() != null ? emp.getGroupName() : "현업부서");
+                map.put("email", emp.getEmail() != null ? emp.getEmail() : (emp.getMemberId() + "@sae-a.com"));
+                map.put("corpId", emp.getCorpName() != null ? emp.getCorpName() : "글로벌세아");
+                map.put("alreadyRegistered", alreadyRegistered);
+                responseList.add(map);
+            }
+
+            return ResponseEntity.ok(responseList);
+        } catch (Exception e) {
+            log.error("사원 검색 처리 중 오류 발생: ", e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "message", "사원 검색 중 서버 오류가 발생했습니다: " + e.getMessage()
+            ));
         }
-
-        return ResponseEntity.ok(responseList);
     }
 
     @GetMapping("/check-username")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'AUDIT_LEADER', 'AUDITOR')")
     public ResponseEntity<?> checkUsername(@RequestParam String username) {
         if (username == null || username.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "확인할 ID를 입력해야 합니다."));
@@ -113,7 +143,7 @@ public class UserController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'AUDIT_LEADER')")
     public ResponseEntity<?> createUser(@RequestBody CreateUserRequest request) {
         try {
             if (request.getUsername() == null || request.getUsername().trim().isEmpty()) {
