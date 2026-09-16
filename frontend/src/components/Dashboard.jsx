@@ -351,8 +351,21 @@ const Dashboard = () => {
 
   // 2번 메뉴 관련 상태 (일반담당자 조치 입력, 검색 필터 및 마스터-디테일 선택)
   const [selectedFindingId, setSelectedFindingId] = useState(null);
-  const [actionFilterDateFrom, setActionFilterDateFrom] = useState('');
-  const [actionFilterDateTo, setActionFilterDateTo] = useState('');
+  const [actionFilterDateFrom, setActionFilterDateFrom] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 3);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+  const [actionFilterDateTo, setActionFilterDateTo] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
   const [actionFilterCorp, setActionFilterCorp] = useState('');
   const [actionFilterDept, setActionFilterDept] = useState('');
   const [actionFilterProject, setActionFilterProject] = useState('');
@@ -2492,7 +2505,7 @@ const Dashboard = () => {
                   }}>
                     {/* 1) 조회기간 from to */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>조회기간(마감기한):</span>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>마감기한:</span>
                       <input
                         type="date"
                         value={actionFilterDateFrom}
@@ -2624,8 +2637,13 @@ const Dashboard = () => {
                     {(actionFilterDateFrom || actionFilterDateTo || actionFilterCorp || actionFilterDept || actionFilterProject || actionFilterAssignee || actionFilterApproval || !excludeCompleted) && (
                       <button
                         onClick={() => {
-                          setActionFilterDateFrom('');
-                          setActionFilterDateTo('');
+                          const d = new Date();
+                          const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                          const d3 = new Date();
+                          d3.setMonth(d3.getMonth() - 3);
+                          const threeAgoStr = `${d3.getFullYear()}-${String(d3.getMonth() + 1).padStart(2, '0')}-${String(d3.getDate()).padStart(2, '0')}`;
+                          setActionFilterDateFrom(threeAgoStr);
+                          setActionFilterDateTo(todayStr);
                           setActionFilterCorp('');
                           setActionFilterDept('');
                           setActionFilterProject('');
@@ -4699,6 +4717,9 @@ const Dashboard = () => {
             const uniqueProjCorps = Array.from(new Set(projects.map(p => p.corpId).filter(Boolean))).sort();
             const uniqueProjStates = Array.from(new Set(projects.map(p => p.projectState).filter(Boolean))).sort();
 
+            // 법인 감사 담당자 / 감사 책임자 / 시스템 관리자가 아닌 경우 소속 법인으로 고정
+            const effectiveProjCorp = isAuditTeam ? filterProjCorp : (user?.corpId || '');
+
             // 필터링 적용된 프로젝트 리스트 계산
             const filteredProjects = projects.filter(p => {
               if (p.createdAt) {
@@ -4708,7 +4729,7 @@ const Dashboard = () => {
               } else {
                 if (filterProjDateFrom || filterProjDateTo) return false;
               }
-              if (filterProjCorp && p.corpId !== filterProjCorp) return false;
+              if (effectiveProjCorp && p.corpId !== effectiveProjCorp) return false;
               if (filterProjState && p.projectState !== filterProjState) return false;
               if (filterProjName && (!p.projectName || !p.projectName.toLowerCase().includes(filterProjName.toLowerCase()))) return false;
               return true;
@@ -4730,9 +4751,7 @@ const Dashboard = () => {
                       <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>
                         📋 법인별 전체 감사 조치율 및 프로젝트 Freeze / Open 관리
                       </h3>
-                      <p style={{ ...styles.cardSubtitle, margin: '6px 0 0 0' }}>
-                        전체 법인의 프로젝트 상태와 법인 내 결재 현황을 점검하며, <b>법인장 결재가 완료된 건에 한하여 프로젝트 동결(Freeze) 및 오픈(Open)</b>을 실행합니다.
-                      </p>
+                      
                     </div>
                   </div>
 
@@ -4766,19 +4785,39 @@ const Dashboard = () => {
                       />
                     </div>
 
-                    {/* 법인 필터 (콤보) */}
+                    {/* 법인 필터 (콤보): 감사팀/시스템관리자가 아닌 경우 본인 소속 법인만 선택 가능 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>소속법인:</span>
-                      <select
-                        value={filterProjCorp}
-                        onChange={(e) => setFilterProjCorp(e.target.value)}
-                        style={{ padding: '5px 8px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
-                      >
-                        <option value="">[ 전체 법인 ]</option>
-                        {uniqueProjCorps.map(corp => (
-                          <option key={corp} value={corp}>{corp}</option>
-                        ))}
-                      </select>
+                      {isAuditTeam ? (
+                        <select
+                          value={filterProjCorp}
+                          onChange={(e) => setFilterProjCorp(e.target.value)}
+                          style={{ padding: '5px 8px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
+                        >
+                          <option value="">[ 전체 법인 ]</option>
+                          {uniqueProjCorps.map(corp => (
+                            <option key={corp} value={corp}>{corp}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <select
+                          value={user?.corpId || ''}
+                          disabled
+                          style={{
+                            padding: '5px 8px',
+                            fontSize: '13px',
+                            borderRadius: '4px',
+                            border: '1px solid #cbd5e1',
+                            backgroundColor: '#f1f5f9',
+                            color: '#1e293b',
+                            fontWeight: 'bold',
+                            cursor: 'not-allowed'
+                          }}
+                          title="법인 감사 담당자 / 감사 책임자 / 시스템 관리자 외에는 해당 법인만 조회할 수 있습니다."
+                        >
+                          <option value={user?.corpId || ''}>{user?.corpId || '소속법인'}</option>
+                        </select>
+                      )}
                     </div>
 
                     {/* 상태 필터 (콤보) */}
@@ -4853,7 +4892,7 @@ const Dashboard = () => {
 
                             setFilterProjDateFrom(threeAgoStr);
                             setFilterProjDateTo(todayStr);
-                            setFilterProjCorp('');
+                            setFilterProjCorp(isAuditTeam ? '' : (user?.corpId || ''));
                             setFilterProjState('');
                             setFilterProjName('');
                           }}
