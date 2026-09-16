@@ -464,7 +464,13 @@ const Dashboard = () => {
     try {
       setHistoryLoading(true);
       const res = await axios.get(`/api/findings/${findingId}/histories`);
-      setFindingHistories(res.data || []);
+      const histories = res.data || [];
+      histories.sort((a, b) => {
+        const tA = new Date(a.actionAt || a.createdAt || 0).getTime();
+        const tB = new Date(b.actionAt || b.createdAt || 0).getTime();
+        return tB - tA;
+      });
+      setFindingHistories(histories);
     } catch (err) {
       console.error('이력 로드 실패:', err);
       setFindingHistories([]);
@@ -3121,11 +3127,11 @@ const Dashboard = () => {
                         )}
                       </div>
 
-                      {/* 하단: 조치 및 검토 이력 타임라인 (누적 이터레이션 기록) */}
+                      {/* 하단: 조치 및 검토 이력 타임라인 */}
                       <div style={{ marginTop: '24px', borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                           <h4 style={{ margin: 0, fontSize: '15px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            조치 및 검토 이력 타임라인 (누적 이터레이션 기록)
+                            조치 및 검토 이력 타임라인
                           </h4>
                           <button
                             onClick={() => fetchFindingHistories(f.findingId)}
@@ -3139,7 +3145,11 @@ const Dashboard = () => {
                           <div style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>이력을 불러오는 중입니다...</div>
                         ) : findingHistories && findingHistories.length > 0 ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
-                            {findingHistories.map((h, idx) => {
+                            {[...findingHistories].sort((a, b) => {
+                              const tA = new Date(a.actionAt || a.createdAt || 0).getTime();
+                              const tB = new Date(b.actionAt || b.createdAt || 0).getTime();
+                              return tB - tA;
+                            }).map((h, idx) => {
                               const getHistoryBadge = (actionType) => {
                                 switch (actionType) {
                                   case 'UPDATE_ACTION': return { text: '조치 수정/임시저장', bg: '#f1f5f9', color: '#475569' };
@@ -3260,30 +3270,16 @@ const Dashboard = () => {
                                     : isAuditConfirmed
                                       ? '감사 검증완료/종료 (업로드 마감)'
                                       : isActionImpossible
-                                        ? '개선불가 상태 (업로드 비활성화)'
+                                        ? '개선불가 상태'
                                         : '개선완료 상태 (업로드 비활성화)'}
                                 </span>
                               )}
                             </div>
 
-                            {/* 상태별 안내 메시지 */}
-                            {isUploadDisabled && (
-                              <div style={{
-                                padding: '8px 12px',
-                                backgroundColor: '#f8fafc',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                color: '#64748b',
-                                marginBottom: '12px'
-                              }}>
-                                ※ 조치가 완료(개선완료 또는 감사 검증종료)되었거나 프로젝트가 동결(Freeze)된 상태에서는 새로운 증빙 파일의 업로드 및 삭제가 차단됩니다. (기등록 파일 열람 및 다운로드는 상시 가능합니다.)
-                              </div>
-                            )}
-
                             {/* 업로드 컨트롤 행 (다중 파일 지원) - 업로드 불가 시 파일선택창 원천 차단 */}
                             {(() => {
                               if (isUploadDisabled) {
+                                if (isActionImpossible) return null;
                                 return (
                                   <div style={{
                                     display: 'flex',
