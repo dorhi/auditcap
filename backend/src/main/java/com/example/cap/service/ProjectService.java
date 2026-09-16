@@ -320,8 +320,10 @@ public class ProjectService {
             throw new AccessDeniedException("감사 담당자(AUDITOR) 또는 시스템 관리자만 내용 확인을 진행할 수 있습니다.");
         }
 
-        // 법인장 최종 확정 선행 여부 검증 (SYSTEM_ADMIN 제외)
-        if (!UserRole.SYSTEM_ADMIN.name().equals(userInfo.getRole()) && !"HEAD_CONFIRMED".equals(project.getAuditApprovalStatus())) {
+        // 법인장 최종 확정 선행 여부 검증 (AUDIT_LEADER, SYSTEM_ADMIN 제외)
+        boolean canSkipHeadConfirm = UserRole.AUDIT_LEADER.name().equals(userInfo.getRole()) ||
+                                     UserRole.SYSTEM_ADMIN.name().equals(userInfo.getRole());
+        if (!canSkipHeadConfirm && !"HEAD_CONFIRMED".equals(project.getAuditApprovalStatus())) {
             throw new IllegalStateException("법인장의 최종 확정(HEAD_CONFIRMED)이 먼저 완료되어야 감사담당자 확인이 가능합니다.");
         }
 
@@ -335,7 +337,6 @@ public class ProjectService {
 
     /**
      * 3단계: 감사 책임자(AUDIT_LEADER) 최종 CONFIRM 및 프로젝트 동결(Freeze)
-     * - 감사 담당자 확인(AUDITOR_CONFIRMED) 선행 필수
      */
     @Transactional
     public void auditLeaderApproveProject(Long projectId, String comment, CustomUserInfo userInfo) {
@@ -349,10 +350,14 @@ public class ProjectService {
             throw new AccessDeniedException("감사팀(AUDITOR, AUDIT_LEADER) 또는 시스템 관리자만 최종 승인을 진행할 수 있습니다.");
         }
 
-        // 법인장 최종 확정 선행 여부 검증 (SYSTEM_ADMIN 제외)
-        boolean isConfirmedByHeadOrAuditor = "HEAD_CONFIRMED".equals(project.getAuditApprovalStatus()) || "AUDITOR_CONFIRMED".equals(project.getAuditApprovalStatus());
-        if (!UserRole.SYSTEM_ADMIN.name().equals(userInfo.getRole()) && !isConfirmedByHeadOrAuditor) {
-            throw new IllegalStateException("법인장의 최종 확정(HEAD_CONFIRMED)이 완료된 프로젝트에 한하여 감사팀 최종 승인 및 동결(FREEZE)이 가능합니다.");
+        // 법인장 최종 확정 선행 여부 검증 (AUDIT_LEADER 및 SYSTEM_ADMIN은 즉시 최종 승인 및 동결 가능)
+        boolean canDirectFreeze = UserRole.AUDIT_LEADER.name().equals(userInfo.getRole()) ||
+                                  UserRole.SYSTEM_ADMIN.name().equals(userInfo.getRole());
+        if (!canDirectFreeze) {
+            boolean isConfirmedByHeadOrAuditor = "HEAD_CONFIRMED".equals(project.getAuditApprovalStatus()) || "AUDITOR_CONFIRMED".equals(project.getAuditApprovalStatus());
+            if (!isConfirmedByHeadOrAuditor) {
+                throw new IllegalStateException("법인장의 최종 확정(HEAD_CONFIRMED)이 완료된 프로젝트에 한하여 감사팀 최종 승인 및 동결(FREEZE)이 가능합니다.");
+            }
         }
 
         project.setAuditApprovalStatus("LEADER_APPROVED");
@@ -397,15 +402,19 @@ public class ProjectService {
             throw new AccessDeniedException("해당 법인의 법인장(CORP_HEAD) 또는 감사팀만 프로젝트 최종 승인(동결) 처리를 할 수 있습니다.");
         }
 
-        // 지적사항들의 법인장 결재 완료 여부 검증
-        List<com.example.cap.entity.Finding> findings = findingRepository.findAllByProjectProjectId(projectId);
-        boolean hasUnapproved = findings.stream().anyMatch(f -> {
-            String status = f.getApprovalStatus();
-            return status == null || (!"SUBMITTED".equals(status) && !"AUDIT_CONFIRMED".equals(status));
-        });
+        // 지적사항들의 법인장 결재 완료 여부 검증 (AUDIT_LEADER, SYSTEM_ADMIN은 즉시 동결 가능)
+        boolean isLeaderOrAdmin = UserRole.AUDIT_LEADER.name().equals(userInfo.getRole()) ||
+                                  UserRole.SYSTEM_ADMIN.name().equals(userInfo.getRole());
+        if (!isLeaderOrAdmin) {
+            List<com.example.cap.entity.Finding> findings = findingRepository.findAllByProjectProjectId(projectId);
+            boolean hasUnapproved = findings.stream().anyMatch(f -> {
+                String status = f.getApprovalStatus();
+                return status == null || (!"SUBMITTED".equals(status) && !"AUDIT_CONFIRMED".equals(status));
+            });
 
-        if (hasUnapproved) {
-            throw new IllegalStateException("해당 프로젝트 내에 법인장 결재가 완료되지 않은 지적사항이 존재하여 동결(Freeze)할 수 없습니다.");
+            if (hasUnapproved) {
+                throw new IllegalStateException("해당 프로젝트 내에 법인장 결재가 완료되지 않은 지적사항이 존재하여 동결(Freeze)할 수 없습니다.");
+            }
         }
 
         project.setProjectState("FREEZE");
