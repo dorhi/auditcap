@@ -57,9 +57,9 @@ public class UploadService {
         Finding finding = findingRepository.findById(findingId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 감사 지적(발견사항) ID입니다: " + findingId));
 
-        // 1. 프로젝트 동결(Freeze) 상태 체크
+        // 1. 프로젝트 완료(Completion) 상태 체크
         if (finding.getProject() != null && "FREEZE".equalsIgnoreCase(finding.getProject().getProjectState())) {
-            throw new IllegalStateException("동결(Freeze) 상태인 프로젝트에는 증빙 파일을 업로드할 수 없습니다.");
+            throw new IllegalStateException("완료(Completion) 상태인 프로젝트에는 증빙 파일을 업로드할 수 없습니다.");
         }
 
         // 2. 조치 완료 및 감사 검증 진행 상태 체크 (감사실 제출 또는 최종 검증 완료 시 업로드 차단)
@@ -189,7 +189,7 @@ public class UploadService {
         Finding finding = attachment.getFinding();
         if (finding != null) {
             if (finding.getProject() != null && "FREEZE".equalsIgnoreCase(finding.getProject().getProjectState())) {
-                throw new IllegalStateException("동결(Freeze) 상태인 프로젝트의 첨부파일은 삭제할 수 없습니다.");
+                throw new IllegalStateException("완료(Completion) 상태인 프로젝트의 첨부파일은 삭제할 수 없습니다.");
             }
             if ("AUDIT_CONFIRMED".equalsIgnoreCase(finding.getApprovalStatus()) || "PENDING_AUDIT".equalsIgnoreCase(finding.getApprovalStatus())) {
                 throw new IllegalStateException("감사실에 제출되어 검증 중이거나 이미 최종 완료된 항목의 증빙 파일은 삭제할 수 없습니다.");

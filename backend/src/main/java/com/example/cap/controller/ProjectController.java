@@ -53,7 +53,7 @@ public class ProjectController {
     }
 
     /**
-     * 동결(FREEZE) 프로젝트 기반 차기 프로젝트 생성
+     * 완료(Completion) 프로젝트 기반 차기 프로젝트 생성
      */
     @PostMapping("/create-from-frozen")
     public ResponseEntity<?> createProjectFromFrozen(@RequestBody Map<String, Object> body,
@@ -116,7 +116,7 @@ public class ProjectController {
         try {
             String comment = body != null ? body.get("comment") : null;
             projectService.auditLeaderApproveProject(projectId, comment, userInfo);
-            return ResponseEntity.ok(Map.of("message", "감사 책임자 최종 승인이 완료되어 프로젝트가 동결(Freeze)되었습니다."));
+            return ResponseEntity.ok(Map.of("message", "감사 책임자 최종 승인이 완료되어 프로젝트가 완료(Completion)되었습니다."));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "LEADER_APPROVE_FAILED", "message", e.getMessage()));
         }
@@ -139,28 +139,28 @@ public class ProjectController {
     }
 
     /**
-     * 법인장(CORP_HEAD)용 프로젝트 최종 승인 및 Freeze
+     * 법인장(CORP_HEAD)용 프로젝트 최종 승인 및 완료(Completion)
      */
     @PostMapping("/{projectId}/freeze")
     public ResponseEntity<?> freezeProject(@PathVariable Long projectId,
                                            @AuthenticationPrincipal CustomUserInfo userInfo) {
         try {
             projectService.freezeProject(projectId, userInfo);
-            return ResponseEntity.ok(Map.of("message", "프로젝트 결재 승인 완료. 데이터가 동결(Freeze)되었습니다."));
+            return ResponseEntity.ok(Map.of("message", "프로젝트 결재 승인 완료. 데이터가 완료(Completion) 처리되었습니다."));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "FREEZE_FAILED", "message", e.getMessage()));
         }
     }
 
     /**
-     * 프로젝트 Freeze 해제 및 OPEN 상태로 변경 (감사팀 또는 법인장 권한)
+     * 프로젝트 완료(Completion) 해제 및 OPEN 상태로 변경 (감사팀 또는 법인장 권한)
      */
     @PostMapping("/{projectId}/unfreeze")
     public ResponseEntity<?> unfreezeProject(@PathVariable Long projectId,
                                               @AuthenticationPrincipal CustomUserInfo userInfo) {
         try {
             projectService.unfreezeProject(projectId, userInfo);
-            return ResponseEntity.ok(Map.of("message", "프로젝트 동결(Freeze)이 해제되고 다시 오픈되었습니다."));
+            return ResponseEntity.ok(Map.of("message", "프로젝트 완료(Completion)가 해제되고 다시 오픈되었습니다."));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", "UNFREEZE_FAILED", "message", e.getMessage()));
         }

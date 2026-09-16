@@ -94,7 +94,7 @@ public class Project {
     @Column(name = "audit_rejected_reason", columnDefinition = "NVARCHAR(500)")
     private String auditRejectedReason;
 
-    // 동결(FREEZE) 프로젝트 기반 차기 프로젝트 연계 필드
+    // 완료(Completion) 프로젝트 기반 차기 프로젝트 연계 필드
     @Column(name = "parent_project_id")
     private Long parentProjectId;
 

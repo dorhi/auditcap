@@ -171,7 +171,7 @@ public class ProjectService {
     }
 
     /**
-     * 동결(FREEZE)된 프로젝트 기반으로 차기 프로젝트 생성
+     * 완료(Completion)된 프로젝트 기반으로 차기 프로젝트 생성
      * - 부모 프로젝트가 FREEZE 상태인지 검증
      * - 부모 프로젝트 정보(법인, 접근권한 등) 승계 및 차수(round) 증가
      * - 부모 프로젝트의 CAP 중 'COMPLETED'(개선완료) 항목은 기본 제외하고, 미완료 건만 신규 프로젝트로 승계(복제)
@@ -187,7 +187,7 @@ public class ProjectService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 부모 프로젝트입니다. ID: " + parentProjectId));
 
         if (!"FREEZE".equals(parent.getProjectState())) {
-            throw new IllegalStateException("동결(FREEZE) 상태인 프로젝트만 기반으로 차기 프로젝트를 생성할 수 있습니다.");
+            throw new IllegalStateException("완료(Completion) 상태인 프로젝트만 기반으로 차기 프로젝트를 생성할 수 있습니다.");
         }
 
         if (projectName == null || !projectName.matches("^\\d{4}_.+$")) {
@@ -253,7 +253,7 @@ public class ProjectService {
                     .actionStatusCode(savedFinding.getActionStatusCode())
                     .actionDeadline(savedFinding.getActionDeadline())
                     .actionText(savedFinding.getActionText())
-                    .comment("동결 프로젝트 [" + parent.getProjectName() + "] (원천 CAP #" + pf.getFindingId() + ")로부터 승계되어 " + nextRound + "차수 이터레이션 시작")
+                    .comment("완료 프로젝트 [" + parent.getProjectName() + "] (원천 CAP #" + pf.getFindingId() + ")로부터 승계되어 " + nextRound + "차수 이터레이션 시작")
                     .createdAt(now)
                     .build();
             findingHistoryRepository.save(history);
@@ -336,7 +336,7 @@ public class ProjectService {
     }
 
     /**
-     * 3단계: 감사 책임자(AUDIT_LEADER) 최종 CONFIRM 및 프로젝트 동결(Freeze)
+     * 3단계: 감사 책임자(AUDIT_LEADER) 최종 CONFIRM 및 프로젝트 완료(Completion)
      */
     @Transactional
     public void auditLeaderApproveProject(Long projectId, String comment, CustomUserInfo userInfo) {
@@ -350,13 +350,13 @@ public class ProjectService {
             throw new AccessDeniedException("감사팀(AUDITOR, AUDIT_LEADER) 또는 시스템 관리자만 최종 승인을 진행할 수 있습니다.");
         }
 
-        // 법인장 최종 확정 선행 여부 검증 (AUDIT_LEADER 및 SYSTEM_ADMIN은 즉시 최종 승인 및 동결 가능)
+        // 법인장 최종 확정 선행 여부 검증 (AUDIT_LEADER 및 SYSTEM_ADMIN은 즉시 최종 승인 및 완료 가능)
         boolean canDirectFreeze = UserRole.AUDIT_LEADER.name().equals(userInfo.getRole()) ||
                                   UserRole.SYSTEM_ADMIN.name().equals(userInfo.getRole());
         if (!canDirectFreeze) {
             boolean isConfirmedByHeadOrAuditor = "HEAD_CONFIRMED".equals(project.getAuditApprovalStatus()) || "AUDITOR_CONFIRMED".equals(project.getAuditApprovalStatus());
             if (!isConfirmedByHeadOrAuditor) {
-                throw new IllegalStateException("법인장의 최종 확정(HEAD_CONFIRMED)이 완료된 프로젝트에 한하여 감사팀 최종 승인 및 동결(FREEZE)이 가능합니다.");
+                throw new IllegalStateException("법인장의 최종 확정(HEAD_CONFIRMED)이 완료된 프로젝트에 한하여 감사팀 최종 승인 및 완료(Completion)가 가능합니다.");
             }
         }
 
@@ -364,7 +364,7 @@ public class ProjectService {
         project.setProjectState("FREEZE");
         project.setAuditLeaderApprovedBy(userInfo.getName() != null && !userInfo.getName().isEmpty() ? userInfo.getName() : userInfo.getUsername());
         project.setAuditLeaderApprovedAt(LocalDateTime.now());
-        project.setAuditLeaderComment(comment != null ? comment : "감사팀 최종 승인 및 동결(FREEZE) 완료");
+        project.setAuditLeaderComment(comment != null ? comment : "감사팀 최종 승인 및 완료(Completion) 처리");
         project.setAuditRejectedReason(null);
         projectRepository.save(project);
     }
@@ -388,7 +388,7 @@ public class ProjectService {
     }
 
     /**
-     * 법인장 또는 감사팀의 프로젝트 Freeze (동결)
+     * 법인장 또는 감사팀의 프로젝트 완료 (Completion)
      */
     @Transactional
     public void freezeProject(Long projectId, CustomUserInfo userInfo) {
@@ -399,10 +399,10 @@ public class ProjectService {
         boolean isHead = UserRole.CORP_HEAD.name().equals(userInfo.getRole()) && project.getCorpId().equals(userInfo.getCorpId());
 
         if (!isAudit && !isHead) {
-            throw new AccessDeniedException("해당 법인의 법인장(CORP_HEAD) 또는 감사팀만 프로젝트 최종 승인(동결) 처리를 할 수 있습니다.");
+            throw new AccessDeniedException("해당 법인의 법인장(CORP_HEAD) 또는 감사팀만 프로젝트 최종 승인(완료) 처리를 할 수 있습니다.");
         }
 
-        // 지적사항들의 법인장 결재 완료 여부 검증 (AUDIT_LEADER, SYSTEM_ADMIN은 즉시 동결 가능)
+        // 지적사항들의 법인장 결재 완료 여부 검증 (AUDIT_LEADER, SYSTEM_ADMIN은 즉시 완료 가능)
         boolean isLeaderOrAdmin = UserRole.AUDIT_LEADER.name().equals(userInfo.getRole()) ||
                                   UserRole.SYSTEM_ADMIN.name().equals(userInfo.getRole());
         if (!isLeaderOrAdmin) {
@@ -413,7 +413,7 @@ public class ProjectService {
             });
 
             if (hasUnapproved) {
-                throw new IllegalStateException("해당 프로젝트 내에 법인장 결재가 완료되지 않은 지적사항이 존재하여 동결(Freeze)할 수 없습니다.");
+                throw new IllegalStateException("해당 프로젝트 내에 법인장 결재가 완료되지 않은 지적사항이 존재하여 완료(Completion)할 수 없습니다.");
             }
         }
 
@@ -422,7 +422,7 @@ public class ProjectService {
     }
 
     /**
-     * 프로젝트 Freeze 해제 및 OPEN 상태로 변경
+     * 프로젝트 완료 해제 및 OPEN 상태로 변경
      */
     @Transactional
     public void unfreezeProject(Long projectId, CustomUserInfo userInfo) {
@@ -433,11 +433,11 @@ public class ProjectService {
         boolean isHead = UserRole.CORP_HEAD.name().equals(userInfo.getRole()) && project.getCorpId().equals(userInfo.getCorpId());
 
         if (!isAudit && !isHead) {
-            throw new AccessDeniedException("해당 법인의 법인장(CORP_HEAD) 또는 감사팀만 동결 해제가 가능합니다.");
+            throw new AccessDeniedException("해당 법인의 법인장(CORP_HEAD) 또는 감사팀만 완료 해제가 가능합니다.");
         }
 
         if (!"FREEZE".equals(project.getProjectState())) {
-            throw new IllegalStateException("동결(FREEZE) 상태의 프로젝트만 오픈할 수 있습니다.");
+            throw new IllegalStateException("완료(Completion) 상태의 프로젝트만 오픈할 수 있습니다.");
         }
 
         // 지적사항들의 법인장 결재 완료 여부 검증

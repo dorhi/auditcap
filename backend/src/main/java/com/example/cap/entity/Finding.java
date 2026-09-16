@@ -86,7 +86,7 @@ public class Finding {
     @Column(name = "completion_date")
     private LocalDateTime completionDate;
 
-    // 이전 차수 CAP 연계 ID (동결 프로젝트 승계 시)
+    // 이전 차수 CAP 연계 ID (완료 프로젝트 승계 시)
     @Column(name = "parent_finding_id")
     private Long parentFindingId;
 

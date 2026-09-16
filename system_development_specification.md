@@ -22,7 +22,7 @@
 - **감사실-피감법인 간 실시간 협업 체계 구축**: 감사 지적사항 발생 시부터 개선 조치 완료까지의 전 과정을 단일 웹 플랫폼에서 통합 관리.
 - **체계적인 조치 기한 관리**: 감사팀의 예상 마감일과 법인의 자체 조치 마감 기한을 분리하여 책임 있는 일정 관리 체계 확립.
 - **엄격한 이터레이션(반복 검토) 및 이력 관리**: 불충분한 조치에 대해 사유를 명시한 재수정/재작성 요청을 지원하며, 모든 검토 및 조치 내역을 타임라인으로 누적 보존.
-- **법인장 최종 확정 및 프로젝트 동결(Freeze)**: 개별 CAP이 모두 종료된 후 법인장과 감사책임자의 최종 승인을 거쳐 데이터 변경을 원천 차단하는 무결성 보장.
+- **법인장 최종 확정 및 프로젝트 완료(Completion)**: 개별 CAP이 모두 종료된 후 법인장과 감사책임자의 최종 승인을 거쳐 데이터 변경을 원천 차단하는 무결성 보장.
 
 ---
 
@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS CAPS_FINDING_HISTORIES (
 | 역할 코드 (`role`) | 한글 명칭 | 주관 업무 및 권한 범위 |
 | :--- | :--- | :--- |
 | `SYSTEM_ADMIN` | 시스템 관리자 | 전체 화면 접근, 계정 생성/권한 제어, 모든 결재 단계 강제 수행 |
-| `AUDIT_LEADER` | 감사책임자 | 감사 프로젝트 총괄, 프로젝트 최종 승인 및 동결(`FREEZE`) |
+| `AUDIT_LEADER` | 감사책임자 | 감사 프로젝트 총괄, 프로젝트 최종 승인 및 완료(`Completion`) |
 | `AUDITOR` | 감사담당자 | 프로젝트/CAP 등록, 법인 제출 조치 검증(CONFIRM) 및 재작성 요청 |
 | `CORP_HEAD` | 법인장 | 소속 법인 프로젝트 최종 확정(`HEAD_CONFIRMED`) |
 | `LEAD_REP` | 법인대표담당 | 소속 법인 조치내용 1차 확인(CONFIRM) 및 재수정 요청(반려) |
@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS CAPS_FINDING_HISTORIES (
   - **3단계 종합 결재 액션 바**:
     1. **1단계: 법인장 최종 확정** (`CORP_HEAD`): 프로젝트 내 **모든 CAP이 `AUDIT_CONFIRMED`일 때만 활성화**.
     2. **2단계: 감사담당자 확인 CONFIRM** (`AUDITOR`): 법인장 확정 완료 후 최종 확인.
-    3. **3단계: 감사책임자 최종 CONFIRM & FREEZE** (`AUDIT_LEADER`): 최종 승인 및 프로젝트 완전 동결.
+    3. **3단계: 감사책임자 최종 CONFIRM & 완료(Completion)** (`AUDIT_LEADER`): 최종 승인 및 프로젝트 완전 완료 처리.
 
 ### [메뉴 4, 5, 6, 7] 모니터링 및 시스템 관리
 - **전체 진행률 점검 및 보고 (`REPORT_MONITORING`)**: 법인별/프로젝트별 종합 통계 및 엑셀 다운로드.
@@ -214,7 +214,7 @@ flowchart TD
     
     H_CONFIRM["🏛️ 1단계: 법인장 최종 확정<br/>(HEAD_CONFIRMED)"]
     AUDITOR_REV["✅ 2단계: 감사담당자 확인<br/>(AUDITOR_CONFIRMED)"]
-    LEADER_FRZ["🔒 3단계: 감사책임자 최종승인<br/>프로젝트 완전 동결 (FREEZE)"]
+    LEADER_FRZ["🔒 3단계: 감사책임자 최종승인<br/>프로젝트 완전 완료 (Completion)"]
 
     %% 흐름 연결
     P1 --> P2 --> M1
@@ -263,7 +263,7 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/projects/{id}/head-confirm` | 법인장 최종 확정 (CONFIRM) | 모든 CAP이 `AUDIT_CONFIRMED` 상태여야 함 |
 | `POST` | `/api/projects/{id}/auditor-review` | 감사담당자 프로젝트 확인 (CONFIRM) | 법인장 확정 완료 후 수행 가능 |
-| `POST` | `/api/projects/{id}/leader-approve` | 감사책임자 최종 승인 및 동결 (FREEZE) | 감사담당자 확인 후 수행 가능 |
+| `POST` | `/api/projects/{id}/leader-approve` | 감사책임자 최종 승인 및 완료 (Completion) | 감사담당자 확인 후 수행 가능 |
 
 ---
 
@@ -298,7 +298,7 @@ npm run dev
 - **역할별 테스트 계정**:
   - `admin` (`SYSTEM_ADMIN`): 전체 메뉴 및 결재 강제 권한
   - `audit01` (`AUDITOR`): 감사팀 프로젝트/CAP 등록 및 감사 검증
-  - `leader01` (`AUDIT_LEADER`): 감사책임자 최종 동결 승인
+  - `leader01` (`AUDIT_LEADER`): 감사책임자 최종 완료 승인
   - `head01` (`CORP_HEAD`): 법인장 최종 확정 결재
   - `lead01` (`LEAD_REP`): 법인 대표담당자 확인 및 재수정 요청
   - `user01` (`MEMBER`): 법인 담당자 조치 작성 및 상신

@@ -117,7 +117,7 @@ public class FindingService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로젝트입니다. ID: " + projectId));
 
         if ("FREEZE".equals(project.getProjectState())) {
-            throw new IllegalStateException("해당 프로젝트는 이미 최종 승인(동결)되어 신규 지적사항을 등록할 수 없습니다.");
+            throw new IllegalStateException("해당 프로젝트는 이미 최종 승인(완료)되어 신규 지적사항을 등록할 수 없습니다.");
         }
 
         // 감사팀 예상 마감일 동기화 (expectedDeadline 또는 targetDate 또는 deadline1st)
@@ -151,7 +151,7 @@ public class FindingService {
 
     /**
      * 감사팀용 발견사항(CAP) 정보 수정
-     * - 감사담당자/감사책임자는 조건(조치 작성 여부, 결재 진행 상태, 프로젝트 동결 여부 등)에 관계없이
+     * - 감사담당자/감사책임자는 조건(조치 작성 여부, 결재 진행 상태, 프로젝트 완료 여부 등)에 관계없이
      *   언제든지 유관부서 및 법인 담당자를 추가/변경할 수 있음.
      */
     @Transactional
@@ -214,7 +214,7 @@ public class FindingService {
 
         Project project = finding.getProject();
         if ("FREEZE".equals(project.getProjectState())) {
-            throw new IllegalStateException("동결(FREEZE)된 프로젝트의 지적사항은 수정할 수 없습니다.");
+            throw new IllegalStateException("완료(Completion)된 프로젝트의 지적사항은 수정할 수 없습니다.");
         }
 
         // 권한 검증
@@ -286,7 +286,7 @@ public class FindingService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지적사항입니다. ID: " + findingId));
 
         if ("FREEZE".equals(finding.getProject().getProjectState())) {
-            throw new IllegalStateException("동결된 프로젝트입니다.");
+            throw new IllegalStateException("완료(Completion)된 프로젝트입니다.");
         }
 
         if (finding.getActionText() == null || finding.getActionText().trim().isEmpty()) {
@@ -324,7 +324,7 @@ public class FindingService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지적사항입니다. ID: " + findingId));
 
         if ("FREEZE".equals(finding.getProject().getProjectState())) {
-            throw new IllegalStateException("동결된 프로젝트입니다.");
+            throw new IllegalStateException("완료(Completion)된 프로젝트입니다.");
         }
 
         String role = userInfo.getRole();
@@ -365,7 +365,7 @@ public class FindingService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지적사항입니다. ID: " + findingId));
 
         if ("FREEZE".equals(finding.getProject().getProjectState())) {
-            throw new IllegalStateException("동결된 프로젝트입니다.");
+            throw new IllegalStateException("완료(Completion)된 프로젝트입니다.");
         }
 
         String role = userInfo.getRole();
@@ -448,7 +448,7 @@ public class FindingService {
 
         Project project = finding.getProject();
         if ("FREEZE".equals(project.getProjectState())) {
-            throw new IllegalStateException("동결(FREEZE)된 프로젝트에는 내용을 추가할 수 없습니다.");
+            throw new IllegalStateException("완료(Completion)된 프로젝트에는 내용을 추가할 수 없습니다.");
         }
 
         if (additionalContent == null || additionalContent.trim().isEmpty()) {
@@ -537,7 +537,7 @@ public class FindingService {
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 지적사항입니다. ID: " + findingId));
 
         if ("FREEZE".equals(finding.getProject().getProjectState())) {
-            throw new IllegalStateException("동결된 프로젝트의 발견사항은 삭제할 수 없습니다.");
+            throw new IllegalStateException("완료(Completion)된 프로젝트의 발견사항은 삭제할 수 없습니다.");
         }
 
         findingRepository.delete(finding);

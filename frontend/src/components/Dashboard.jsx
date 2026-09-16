@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthProvider';
 import axios from 'axios';
 import MenuManagement from './MenuManagement';
@@ -1240,7 +1240,7 @@ const Dashboard = () => {
     }
   };
 
-  // 1번 메뉴: 동결(FREEZE) 프로젝트 기반 차기 프로젝트 생성 핸들러
+  // 1번 메뉴: 완료(Completion) 프로젝트 기반 차기 프로젝트 생성 핸들러
   const handleCreateProjectFromFrozen = async (e) => {
     e.preventDefault();
     setError('');
@@ -1251,7 +1251,7 @@ const Dashboard = () => {
       return;
     }
     if (!selectedFrozenParentId) {
-      setError('기반이 될 동결 프로젝트를 선택해 주세요.');
+      setError('기반이 될 완료 프로젝트를 선택해 주세요.');
       return;
     }
     if (!newProjectName.trim()) {
@@ -1269,14 +1269,14 @@ const Dashboard = () => {
         projectName: newProjectName.trim(),
         deadline1st: deadline1st + 'T00:00:00'
       });
-      setMessage(`동결 프로젝트 기반 차기 프로젝트 '${res.data.projectName}'(${res.data.round || 2}차)가 성공적으로 생성되었습니다. (개선완료 건 제외 승계 완료)`);
+      setMessage(`완료 프로젝트 기반 차기 프로젝트 '${res.data.projectName}'(${res.data.round || 2}차)가 성공적으로 생성되었습니다. (개선완료 건 제외 승계 완료)`);
       setNewProjectName('');
       setDeadline1st('');
       setSelectedFrozenParentId('');
       setProjectCreateMode('NEW');
       loadData();
     } catch (err) {
-      setError(err.response?.data?.message || '동결 프로젝트 기반 차기 프로젝트 생성 실패');
+      setError(err.response?.data?.message || '완료 프로젝트 기반 차기 프로젝트 생성 실패');
     }
   };
 
@@ -1286,7 +1286,7 @@ const Dashboard = () => {
     setMessage('');
 
     if (projectState === 'FREEZE') {
-      setError('이 프로젝트는 최종 승인 완료로 동결(Freeze) 상태이므로 조치를 변경할 수 없습니다.');
+      setError('이 프로젝트는 최종 승인 완료로 완료(Completion) 상태이므로 조치를 변경할 수 없습니다.');
       return;
     }
 
@@ -1508,22 +1508,22 @@ const Dashboard = () => {
     }
   };
 
-  // [프로젝트 최종 결재] 3단계: 감사팀 최종 CONFIRM & FREEZE
+  // [프로젝트 최종 결재] 3단계: 감사팀 최종 CONFIRM & 완료(Completion)
   const handleLeaderConfirmFreezeProject = async (projectId) => {
     setError('');
     setMessage('');
-    if (!window.confirm('감사팀 최종 승인을 진행하시겠습니까? 승인 시 프로젝트가 동결(FREEZE)되어 더 이상 수정할 수 없습니다.')) {
+    if (!window.confirm('감사팀 최종 승인을 진행하시겠습니까? 승인 시 프로젝트가 완료(Completion)되어 더 이상 수정할 수 없습니다.')) {
       return;
     }
-    const comment = window.prompt('감사팀 최종 승인 및 동결 의견(선택 사항):', '감사팀 최종 승인 및 동결 완료');
+    const comment = window.prompt('감사팀 최종 승인 및 완료 의견(선택 사항):', '감사팀 최종 승인 및 완료 처리');
     if (comment === null) return;
 
     try {
       const res = await axios.post(`/api/projects/${projectId}/leader-approve`, { comment });
-      setMessage(res.data.message || '감사팀 최종 승인이 완료되어 프로젝트가 동결(FREEZE)되었습니다.');
+      setMessage(res.data.message || '감사팀 최종 승인이 완료되어 프로젝트가 완료(Completion)되었습니다.');
       loadData();
     } catch (err) {
-      setError(err.response?.data?.message || '감사팀 최종 승인 및 동결 실패');
+      setError(err.response?.data?.message || '감사팀 최종 승인 및 완료 처리 실패');
     }
   };
 
@@ -1595,32 +1595,32 @@ const Dashboard = () => {
     }
   };
 
-  // 4번 메뉴: [감사 책임자] 조치내용 확인 및 즉시 최종 동결(FREEZE) 실행
+  // 4번 메뉴: [감사 책임자] 조치내용 확인 및 즉시 최종 완료(Completion) 실행
   const handleConfirmAuditorProjReviewAndFreeze = async () => {
     if (!targetAuditProject) return;
-    if (!window.confirm(`[${targetAuditProject.projectName}] 프로젝트의 조치내용을 확인하고, 즉시 최종 확정 및 동결(FREEZE) 처리하시겠습니까?`)) {
+    if (!window.confirm(`[${targetAuditProject.projectName}] 프로젝트의 조치내용을 확인하고, 즉시 최종 확정 및 완료(Completion) 처리하시겠습니까?`)) {
       return;
     }
     try {
-      const commentText = auditProjCommentInput.trim() || '감사 책임자 조치내용 확인 및 최종 확정/동결 완료';
+      const commentText = auditProjCommentInput.trim() || '감사 책임자 조치내용 확인 및 최종 확정/완료 처리';
 
       // 1. 조치 확인 처리
       await axios.post(`/api/projects/${targetAuditProject.projectId}/auditor-review`, {
         comment: commentText
       });
 
-      // 2. 최종 승인 및 동결(FREEZE) 처리
+      // 2. 최종 승인 및 완료(Completion) 처리
       await axios.post(`/api/projects/${targetAuditProject.projectId}/leader-approve`, {
         comment: commentText
       });
 
-      setMessage(`[${targetAuditProject.projectName}] 프로젝트의 조치 확인 및 최종 동결(FREEZE) 처리가 완료되었습니다.`);
+      setMessage(`[${targetAuditProject.projectName}] 프로젝트의 조치 확인 및 최종 완료(Completion) 처리가 완료되었습니다.`);
       setAuditorReviewProjModalOpen(false);
       setTargetAuditProject(null);
       setAuditProjCommentInput('');
       loadData();
     } catch (err) {
-      alert(err.response?.data?.message || '조치 확인 및 동결 처리 실패');
+      alert(err.response?.data?.message || '조치 확인 및 완료 처리 실패');
     }
   };
 
@@ -1631,14 +1631,14 @@ const Dashboard = () => {
     setLeaderApproveProjModalOpen(true);
   };
 
-  // 4번 메뉴: [감사 책임자] 프로젝트 최종 승인 및 동결(Freeze) 실행
+  // 4번 메뉴: [감사 책임자] 프로젝트 최종 승인 및 완료(Completion) 실행
   const handleConfirmLeaderProjApprove = async () => {
     if (!targetAuditProject) return;
     try {
       const res = await axios.post(`/api/projects/${targetAuditProject.projectId}/leader-approve`, {
         comment: auditProjCommentInput
       });
-      setMessage(res.data.message || '감사 책임자 최종 승인이 완료되어 프로젝트가 동결(Freeze)되었습니다.');
+      setMessage(res.data.message || '감사 책임자 최종 승인이 완료되어 프로젝트가 완료(Completion)되었습니다.');
       setLeaderApproveProjModalOpen(false);
       setTargetAuditProject(null);
       setAuditProjCommentInput('');
@@ -1690,7 +1690,7 @@ const Dashboard = () => {
     }
 
     if (projectState === 'FREEZE') {
-      setError('동결(Freeze) 상태인 프로젝트에는 증빙 파일을 업로드할 수 없습니다.');
+      setError('완료(Completion) 상태인 프로젝트에는 증빙 파일을 업로드할 수 없습니다.');
       return;
     }
 
@@ -1855,51 +1855,51 @@ const Dashboard = () => {
     }
   };
 
-  // 4번 메뉴: 프로젝트 Freeze (동결) 처리
+  // 4번 메뉴: 프로젝트 완료 (Completion) 처리
   const handleFreezeProject = async (projectId, projectCorpId) => {
     setError('');
     setMessage('');
 
     if (user.role !== 'CORP_HEAD' && !isAuditTeam) {
-      setError('법인장(CORP_HEAD) 또는 감사팀만 프로젝트 Freeze(동결)를 실행할 수 있습니다.');
+      setError('법인장(CORP_HEAD) 또는 감사팀만 프로젝트 완료(Completion) 처리를 실행할 수 있습니다.');
       return;
     }
 
     if (!isAuditTeam && user.corpId !== projectCorpId) {
-      setError('본인 소속 법인의 프로젝트만 동결 처리가 가능합니다.');
+      setError('본인 소속 법인의 프로젝트만 완료 처리가 가능합니다.');
       return;
     }
 
     try {
       await axios.post(`/api/projects/${projectId}/freeze`);
-      setMessage('프로젝트가 안전하게 동결(Freeze)되었습니다.');
+      setMessage('프로젝트가 안전하게 완료(Completion)되었습니다.');
       loadData();
     } catch (err) {
-      setError(err.response?.data?.message || '동결(Freeze) 처리 중 오류가 발생했습니다.');
+      setError(err.response?.data?.message || '완료(Completion) 처리 중 오류가 발생했습니다.');
     }
   };
 
-  // 4번 메뉴: 프로젝트 Open (동결 해제) 처리
+  // 4번 메뉴: 프로젝트 Open (완료 해제) 처리
   const handleUnfreezeProject = async (projectId, projectCorpId) => {
     setError('');
     setMessage('');
 
     if (user.role !== 'CORP_HEAD' && !isAuditTeam) {
-      setError('법인장(CORP_HEAD) 또는 감사팀만 프로젝트 Open(동결 해제)을 실행할 수 있습니다.');
+      setError('법인장(CORP_HEAD) 또는 감사팀만 프로젝트 Open(완료 해제)을 실행할 수 있습니다.');
       return;
     }
 
     if (!isAuditTeam && user.corpId !== projectCorpId) {
-      setError('본인 소속 법인의 프로젝트만 동결 해제가 가능합니다.');
+      setError('본인 소속 법인의 프로젝트만 완료 해제가 가능합니다.');
       return;
     }
 
     try {
       await axios.post(`/api/projects/${projectId}/unfreeze`);
-      setMessage('프로젝트 동결이 해제되고 다시 오픈(Open)되었습니다.');
+      setMessage('프로젝트 완료가 해제되고 다시 오픈(Open)되었습니다.');
       loadData();
     } catch (err) {
-      setError(err.response?.data?.message || '동결 해제(Open) 처리 중 오류가 발생했습니다.');
+      setError(err.response?.data?.message || '완료 해제(Open) 처리 중 오류가 발생했습니다.');
     }
   };
 
@@ -2022,7 +2022,7 @@ const Dashboard = () => {
                   <div>
                     <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>감사 프로젝트 생성 및 연계 관리</h3>
                     <p style={{ ...styles.cardSubtitle, margin: '4px 0 0 0' }}>
-                      새로운 감사 프로젝트를 생성하거나, 이전 동결(FREEZE) 프로젝트를 승계하여 차기 프로젝트를 개설합니다. (감사팀 전용)
+                      새로운 감사 프로젝트를 생성하거나, 이전 완료(Completion) 프로젝트를 승계하여 차기 프로젝트를 개설합니다. (감사팀 전용)
                     </p>
                   </div>
 
@@ -2071,7 +2071,7 @@ const Dashboard = () => {
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      동결 프로젝트 기반 차기 프로젝트 생성
+                      완료 프로젝트 기반 차기 프로젝트 생성
                     </button>
                   </div>
                 </div>
@@ -2368,7 +2368,7 @@ const Dashboard = () => {
                     <button type="submit" style={styles.primaryBtn}>신규 프로젝트 저장</button>
                   </form>
                 ) : (
-                  /* 동결 프로젝트 기반 차기 프로젝트 생성 폼 */
+                  /* 완료 프로젝트 기반 차기 프로젝트 생성 폼 */
                   <form onSubmit={handleCreateProjectFromFrozen} style={styles.form}>
                     <div style={{
                       padding: '16px',
@@ -2379,7 +2379,7 @@ const Dashboard = () => {
                     }}>
                       <div style={styles.formGroup}>
                         <label style={{ ...styles.formLabel, fontWeight: 'bold', color: '#1e293b' }}>
-                          기반이 될 이전 동결(FREEZE) 프로젝트 선택 <span style={{ color: '#ef4444' }}>*</span>
+                          기반이 될 이전 완료(Completion) 프로젝트 선택 <span style={{ color: '#ef4444' }}>*</span>
                         </label>
                         <select
                           value={selectedFrozenParentId}
@@ -2397,7 +2397,7 @@ const Dashboard = () => {
                           style={styles.select}
                           required
                         >
-                          <option value="">-- 동결(FREEZE) 완료 프로젝트 선택 --</option>
+                          <option value="">-- 완료(Completion) 프로젝트 선택 --</option>
                           {frozenProjects.map(fp => (
                             <option key={fp.projectId} value={fp.projectId}>
                               [{fp.corpId}] {fp.projectName} ({fp.round || 1}차 프로젝트)
@@ -2406,7 +2406,7 @@ const Dashboard = () => {
                         </select>
                         {frozenProjects.length === 0 && (
                           <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '6px' }}>
-                            ※ 현재 최종 동결(FREEZE) 완료된 프로젝트가 없습니다. (법인장 최종 확정이 완료된 프로젝트만 모태로 승계 가능합니다)
+                            ※ 현재 최종 완료(Completion)된 프로젝트가 없습니다. (법인장 최종 확정이 완료된 프로젝트만 모태로 승계 가능합니다)
                           </div>
                         )}
                       </div>
@@ -2527,7 +2527,7 @@ const Dashboard = () => {
                         cursor: selectedFrozenParentId ? 'pointer' : 'not-allowed'
                       }}
                     >
-                      동결 프로젝트 기반 차기 프로젝트 생성 및 CAP 승계 ({inheritableFindings.length}건)
+                      완료 프로젝트 기반 차기 프로젝트 생성 및 CAP 승계 ({inheritableFindings.length}건)
                     </button>
                   </form>
                 )}
@@ -2945,7 +2945,7 @@ const Dashboard = () => {
                           {isAuditConfirmed && <span style={{ ...styles.badgeStatus, backgroundColor: '#dbeafe', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>감사담당자 확인완료 (조치종료)</span>}
 
                           <span style={f.project?.projectState === 'FREEZE' ? styles.badgeFreeze : styles.badgeOpen}>
-                            {f.project?.projectState === 'FREEZE' ? '동결 (FREEZE)' : '진행중 (OPEN)'}
+                            {f.project?.projectState === 'FREEZE' ? '완료 (Completion)' : '진행중 (OPEN)'}
                           </span>
                         </div>
                       </div>
@@ -3249,7 +3249,7 @@ const Dashboard = () => {
                             </div>
                           </div>
                         ) : (
-                          <div style={styles.freezeNotice}>※ 본 프로젝트는 최종 결재 승인 완료에 따라 동결(Freeze)되어 조치 수정이 불가합니다.</div>
+                          <div style={styles.freezeNotice}>※ 본 프로젝트는 최종 결재 승인 완료에 따라 완료(Completion)되어 조치 수정이 불가합니다.</div>
                         )}
 
                         {/* 유관부서 지정자 협조 내용 / 의견 추가 박스 */}
@@ -3469,7 +3469,7 @@ const Dashboard = () => {
                                   border: '1px solid #fecaca'
                                 }}>
                                   {isProjectFrozen
-                                    ? '동결(Freeze) 상태'
+                                    ? '완료(Completion) 상태'
                                     : isAuditConfirmed
                                       ? '감사 검증완료/종료'
                                       : isPendingAudit
@@ -3498,7 +3498,7 @@ const Dashboard = () => {
                                     <div>
                                       <b style={{ color: '#475569' }}>증빙자료 파일 선택 및 업로드 차단:</b>{' '}
                                       {isProjectFrozen
-                                        ? '프로젝트가 동결(Freeze) 상태이므로 파일 선택 및 추가 업로드가 차단되었습니다.'
+                                        ? '프로젝트가 완료(Completion) 상태이므로 파일 선택 및 추가 업로드가 차단되었습니다.'
                                         : isAuditConfirmed
                                           ? '감사팀의 최종 검증이 완료/종료되어 파일 선택 및 추가 업로드가 마감되었습니다.'
                                           : isPendingAudit
@@ -3824,7 +3824,7 @@ const Dashboard = () => {
                       <option value="">-- 대상 프로젝트를 선택하세요 --</option>
                       {selectableProjects.map(p => (
                         <option key={p.projectId} value={p.projectId}>
-                          {p.projectName} {p.round && p.round > 1 ? `[${p.round}차: ${p.parentProjectName || ''} 연계]` : ''} [{p.projectState === 'FREEZE' ? '동결(FREEZE)' : 'OPEN'}] ({p.corpId})
+                          {p.projectName} {p.round && p.round > 1 ? `[${p.round}차: ${p.parentProjectName || ''} 연계]` : ''} [{p.projectState === 'FREEZE' ? '완료(Completion)' : 'OPEN'}] ({p.corpId})
                         </option>
                       ))}
                     </select>
@@ -3842,7 +3842,7 @@ const Dashboard = () => {
                           }
                         }}
                       />
-                      <span>동결(FREEZE) 포함</span>
+                      <span>완료(Completion) 포함</span>
                     </label>
                   </div>
 
@@ -3904,7 +3904,7 @@ const Dashboard = () => {
                           // 직관적이고 선명한 CAP 진행 상태 뱃지
                           const getStatusBadge = () => {
                             if (cap.project?.projectState === 'FREEZE') {
-                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#334155', color: '#ffffff' }}>동결(FREEZE)</span>;
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#334155', color: '#ffffff' }}>완료(Completion)</span>;
                             }
                             const st = cap.approvalStatus || 'DRAFT';
                             if (st === 'APPROVED') {
@@ -4007,7 +4007,7 @@ const Dashboard = () => {
                 {isProjectSelected && (
                   <div style={styles.card}>
 
-                    {/* 동결 프로젝트 또는 일반 사용자 읽기전용 시 간소 알림 */}
+                    {/* 완료(Completion) 프로젝트 또는 일반 사용자 읽기전용 시 간소 알림 */}
                     {selectedCapId && !canEditCurrentCap && !isAuditTeam && (
                       <div style={{
                         ...styles.freezeNotice,
@@ -4017,7 +4017,7 @@ const Dashboard = () => {
                         borderRadius: '6px'
                       }}>
                         {isProjectFrozen
-                          ? '※ 본 프로젝트는 최종 승인 완료로 동결(Freeze) 상태이므로 지적사항을 수정할 수 없습니다 (읽기 전용).'
+                          ? '※ 본 프로젝트는 최종 승인 완료로 완료(Completion) 상태이므로 지적사항을 수정할 수 없습니다 (읽기 전용).'
                           : '※ 본 지적사항은 이미 조치 작성 또는 결재 진행 중이므로 내용을 수정할 수 없습니다 (읽기 전용).'}
                       </div>
                     )}
@@ -4895,7 +4895,7 @@ const Dashboard = () => {
           })()}
 
           {/* ================================================================= */}
-          {/* 4번 탭: 법인별 전체 감사 조치율 및 프로젝트 Freeze/Open 관리 */}
+          {/* 4번 탭: 법인별 전체 감사 조치율 및 프로젝트 완료(Completion)/Open 관리 */}
           {/* ================================================================= */}
           {isMenuActive('REPORT_MONITORING') && (() => {
             // 필터용 고유 옵션 리스트 동적 추출
@@ -4934,7 +4934,7 @@ const Dashboard = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>
-                        법인별 전체 감사 조치율 및 프로젝트 Freeze / Open 관리
+                        법인별 전체 감사 조치율 및 프로젝트 완료(Completion) / Open 관리
                       </h3>
                       
                     </div>
@@ -5259,20 +5259,20 @@ const Dashboard = () => {
                                       </>
                                     )}
 
-                                    {/* 2) 감사 책임자 전용 버튼 (담당자 내용확인 / 보완요청 / 최종 확정 및 Freeze) */}
+                                    {/* 2) 감사 책임자 전용 버튼 (담당자 내용확인 / 보완요청 / 최종 확정 및 완료) */}
                                     {user.role === 'AUDIT_LEADER' && (
                                       <>
                                         {p.projectState === 'FREEZE' ? (
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <span style={{ fontSize: '12px', color: '#047857', fontWeight: 'bold', backgroundColor: '#d1fae5', padding: '3px 8px', borderRadius: '4px' }}>
-                                              최종 확정 및 동결 완료 (FREEZE)
+                                              최종 확정 및 완료 (Completion)
                                             </span>
                                             <button
                                               onClick={() => handleUnfreezeProject(p.projectId, p.corpId)}
                                               style={styles.unfreezeBtn}
-                                              title="프로젝트 동결을 해제(Open)합니다."
+                                              title="프로젝트 완료를 해제(Open)합니다."
                                             >
-                                              동결해제(Open)
+                                              완료해제(Open)
                                             </button>
                                           </div>
                                         ) : (
@@ -5286,7 +5286,7 @@ const Dashboard = () => {
                                               <button
                                                 onClick={() => openAuditorReviewProjModal(p)}
                                                 style={{ ...styles.approveActionBtn, backgroundColor: '#4f46e5' }}
-                                                title="감사 책임자로서 조치내용을 직접 확인합니다. (확인 후 바로 FREEZE 가능)"
+                                                title="감사 책임자로서 조치내용을 직접 확인합니다. (확인 후 바로 완료(Completion) 가능)"
                                               >
                                                 담당자 내용 확인
                                               </button>
@@ -5301,9 +5301,9 @@ const Dashboard = () => {
                                                 alignItems: 'center',
                                                 gap: '4px'
                                               }}
-                                              title="감사 책임자로서 최종 승인하고 프로젝트를 동결(FREEZE)합니다."
+                                              title="감사 책임자로서 최종 승인하고 프로젝트를 완료(Completion)합니다."
                                             >
-                                              최종 확정 및 동결 (FREEZE)
+                                              최종 확정 및 완료 (Completion)
                                             </button>
                                             <button
                                               onClick={() => openAuditRejectProjModal(p)}
@@ -5333,14 +5333,14 @@ const Dashboard = () => {
                                             onClick={() => openLeaderApproveProjModal(p)}
                                             style={styles.approveActionBtn}
                                           >
-                                            최종 확정 (Freeze)
+                                            최종 확정 (Completion)
                                           </button>
                                         ) : (
                                           <button
                                             onClick={() => handleUnfreezeProject(p.projectId, p.corpId)}
                                             style={styles.unfreezeBtn}
                                           >
-                                            동결해제(Open)
+                                            완료해제(Open)
                                           </button>
                                         )}
                                         <button
@@ -5355,7 +5355,7 @@ const Dashboard = () => {
                                     {/* 4) 기타 역할 사용자 (법인장, 대표, 일반 등) */}
                                     {!isAuditTeam && (
                                       <span style={{ fontSize: '12px', color: '#64748b' }}>
-                                        {p.projectState === 'FREEZE' ? '최종 동결 완료' : '감사팀 승인 진행 중'}
+                                        {p.projectState === 'FREEZE' ? '최종 완료' : '감사팀 승인 진행 중'}
                                       </span>
                                     )}
                                   </div>
@@ -6230,7 +6230,7 @@ const Dashboard = () => {
                         프로젝트 최종 검증 및 확정 (CONFIRM)
                       </h3>
                       <p style={styles.cardSubtitle}>
-                        감사 프로젝트별 발견사항(CAP)의 조치 및 감사 검증 결과를 종합 검토하고 최종 확정(CONFIRM)을 진행합니다. 모든 발견사항이 조치 완료된 경우에만 확정할 수 있으며, 감사팀은 확정 완료 건을 조회하여 최종 승인 및 동결(FREEZE)합니다.
+                        감사 프로젝트별 발견사항(CAP)의 조치 및 감사 검증 결과를 종합 검토하고 최종 확정(CONFIRM)을 진행합니다. 모든 발견사항이 조치 완료된 경우에만 확정할 수 있으며, 감사팀은 확정 완료 건을 조회하여 최종 승인 및 완료(Completion)합니다.
                       </p>
                     </div>
                   </div>
@@ -6269,7 +6269,7 @@ const Dashboard = () => {
                         <option value="ALL">전체 상태</option>
                         <option value="READY">확정 대기 (전체 CAP 검증완료 건)</option>
                         <option value="CONFIRMED">확정 완료 건</option>
-                        <option value="FREEZE">최종 동결 (FREEZE) 완료 건</option>
+                        <option value="FREEZE">최종 완료 (Completion) 건</option>
                         <option value="IN_PROGRESS">진행중 (검증 미완료 건)</option>
                       </select>
                     </div>
@@ -6429,7 +6429,7 @@ const Dashboard = () => {
                                 <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                                   {isFreeze ? (
                                     <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#047857', backgroundColor: '#d1fae5', padding: '3px 8px', borderRadius: '4px' }}>
-                                      동결(FREEZE)
+                                      완료(Completion)
                                     </span>
                                   ) : (
                                     <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#0284c7', backgroundColor: '#e0f2fe', padding: '3px 8px', borderRadius: '4px' }}>
@@ -6461,7 +6461,7 @@ const Dashboard = () => {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={currentProj.projectState === 'FREEZE' ? styles.badgeFreeze : styles.badgeOpen}>
-                          {currentProj.projectState === 'FREEZE' ? '프로젝트 동결 (FREEZE)' : '진행중 (OPEN)'}
+                          {currentProj.projectState === 'FREEZE' ? '프로젝트 완료 (Completion)' : '진행중 (OPEN)'}
                         </span>
                         <span style={{ fontSize: '13px', fontWeight: 'bold', color: isAllAuditConfirmed ? '#16a34a' : '#dc2626', backgroundColor: isAllAuditConfirmed ? '#dcfce7' : '#fee2e2', padding: '4px 10px', borderRadius: '6px' }}>
                           지적사항 검증: {auditConfirmedCapsCount} / {totalCapsCount}건 ({isAllAuditConfirmed ? '100% 완료' : `${totalCapsCount - auditConfirmedCapsCount}건 미완료`})
@@ -6469,7 +6469,7 @@ const Dashboard = () => {
                       </div>
                     </div>
 
-                    {/* 종합 결재 및 동결(FREEZE) 액션 바 */}
+                    {/* 종합 결재 및 완료(Completion) 액션 바 */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'stretch' }}>
                       {/* 좌측: [요구사항 4] 최종 확정 (CONFIRM) 영역 */}
                       <div style={{ padding: '16px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -6546,20 +6546,20 @@ const Dashboard = () => {
                         </div>
                       </div>
 
-                      {/* 우측: [요구사항 5] 감사팀 조회 및 동결(FREEZE) 영역 */}
+                      {/* 우측: [요구사항 5] 감사팀 조회 및 완료(Completion) 영역 */}
                       <div style={{ padding: '16px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <h4 style={{ margin: 0, fontSize: '14px', color: '#1e293b' }}>
-                              [2단계] 감사팀 최종 승인 및 동결 (FREEZE)
+                              [2단계] 감사팀 최종 승인 및 완료 (Completion)
                             </h4>
                             {currentProj.projectState === 'FREEZE' ? (
                               <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#047857', backgroundColor: '#d1fae5', padding: '2px 8px', borderRadius: '4px' }}>
-                                동결 완료
+                                완료
                               </span>
                             ) : (currentProj.headConfirmedBy || user?.role === 'AUDIT_LEADER' || user?.role === 'SYSTEM_ADMIN') ? (
                               <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '4px' }}>
-                                동결 가능
+                                완료 가능
                               </span>
                             ) : (
                               <span style={{ fontSize: '12px', color: '#94a3b8', backgroundColor: '#f1f5f9', padding: '2px 8px', borderRadius: '4px' }}>
@@ -6572,7 +6572,7 @@ const Dashboard = () => {
                             {currentProj.projectState === 'FREEZE' ? (
                               <div>
                                 <div style={{ color: '#047857', fontWeight: 'bold' }}>
-                                  승인 및 동결 완료 ({getAssigneeName(currentProj.auditLeaderApprovedBy) || '감사팀'} / {currentProj.auditLeaderApprovedAt ? new Date(currentProj.auditLeaderApprovedAt).toLocaleString() : ''})
+                                  승인 및 완료 처리 ({getAssigneeName(currentProj.auditLeaderApprovedBy) || '감사팀'} / {currentProj.auditLeaderApprovedAt ? new Date(currentProj.auditLeaderApprovedAt).toLocaleString() : ''})
                                 </div>
                                 {currentProj.auditLeaderComment && (
                                   <div style={{ marginTop: '4px', color: '#334155' }}>
@@ -6582,21 +6582,21 @@ const Dashboard = () => {
                               </div>
                             ) : currentProj.headConfirmedBy ? (
                               <div style={{ color: '#059669' }}>
-                                최종 확정(CONFIRM)이 완료되었습니다. 감사팀에서 내용을 최종 검토한 후 프로젝트를 동결(FREEZE)할 수 있습니다.
+                                최종 확정(CONFIRM)이 완료되었습니다. 감사팀에서 내용을 최종 검토한 후 프로젝트를 완료(Completion)할 수 있습니다.
                               </div>
                             ) : (user?.role === 'AUDIT_LEADER' || user?.role === 'SYSTEM_ADMIN') ? (
                               <div style={{ color: '#059669' }}>
-                                감사 책임자 권한으로 프로젝트를 즉시 최종 승인 및 동결(FREEZE)할 수 있습니다.
+                                감사 책임자 권한으로 프로젝트를 즉시 최종 승인 및 완료(Completion)할 수 있습니다.
                               </div>
                             ) : (
                               <div style={{ color: '#64748b' }}>
-                                ※ 최종 확정(CONFIRM)이 완료된 건에 한하여 감사팀이 최종 승인 및 동결(FREEZE)을 실행할 수 있습니다.
+                                ※ 최종 확정(CONFIRM)이 완료된 건에 한하여 감사팀이 최종 승인 및 완료(Completion)를 실행할 수 있습니다.
                               </div>
                             )}
                           </div>
                         </div>
 
-                        {/* 감사팀 FREEZE 버튼 */}
+                        {/* 감사팀 완료(Completion) 버튼 */}
                         <div>
                           {(isAuditTeam || user?.role === 'SYSTEM_ADMIN') && currentProj.projectState !== 'FREEZE' && (
                             <button
@@ -6619,7 +6619,7 @@ const Dashboard = () => {
                                 boxShadow: (currentProj.headConfirmedBy || user?.role === 'AUDIT_LEADER' || user?.role === 'SYSTEM_ADMIN') ? '0 2px 6px rgba(5,150,105,0.3)' : 'none'
                               }}
                             >
-                              {(currentProj.headConfirmedBy || user?.role === 'AUDIT_LEADER' || user?.role === 'SYSTEM_ADMIN') ? '감사팀 최종 승인 및 동결 (FREEZE 실행)' : '감사팀 동결 불가 (최종 미확정)'}
+                              {(currentProj.headConfirmedBy || user?.role === 'AUDIT_LEADER' || user?.role === 'SYSTEM_ADMIN') ? '감사팀 최종 승인 및 완료 (Completion 실행)' : '감사팀 완료 불가 (최종 미확정)'}
                             </button>
                           )}
                         </div>
@@ -6929,7 +6929,7 @@ const Dashboard = () => {
                                      h.actionType === 'SAVE_DRAFT' ? '조치계획 임시저장' :
                                      h.actionType === 'UPDATE_CAP' ? '지적사항 정보 수정' :
                                      h.actionType === 'HEAD_CONFIRM' ? '법인장 최종 확정' :
-                                     h.actionType === 'FREEZE' ? '감사팀 동결 완료' :
+                                     h.actionType === 'FREEZE' ? '감사팀 완료 처리' :
                                      h.actionType || '이력'}
                                   </span>
                                   <span style={{ color: '#64748b' }}>
@@ -7123,9 +7123,9 @@ const Dashboard = () => {
                     alignItems: 'center',
                     gap: '4px'
                   }}
-                  title="조치내용 확인과 동시에 프로젝트를 최종 확정하고 동결(FREEZE)합니다."
+                  title="조치내용 확인과 동시에 프로젝트를 최종 확정하고 완료(Completion)합니다."
                 >
-                  확인 및 즉시 최종 동결 (FREEZE)
+                  확인 및 즉시 최종 완료 (Completion)
                 </button>
               )}
             </div>
@@ -7133,13 +7133,13 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* [모달 4] 4번 메뉴: 감사 책임자 프로젝트 최종 승인 및 동결(Freeze) 모달 */}
+      {/* [모달 4] 4번 메뉴: 감사 책임자 프로젝트 최종 승인 및 완료(Completion) 모달 */}
       {leaderApproveProjModalOpen && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
               <h3 style={{ margin: 0, color: '#059669' }}>
-                감사 책임자 최종 확정 및 동결 (FREEZE)
+                감사 책임자 최종 확정 및 완료 (Completion)
               </h3>
               <button onClick={() => setLeaderApproveProjModalOpen(false)} style={styles.modalCloseBtn}>×</button>
             </div>
@@ -7154,7 +7154,7 @@ const Dashboard = () => {
                 </div>
               )}
               <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', padding: '10px 12px', borderRadius: '6px', marginBottom: '14px', fontSize: '12px', color: '#065f46' }}>
-                ※ 최종 확정 시 프로젝트가 <b>동결(Freeze)</b> 처리되며, 법인 및 담당자의 추가 수정이 차단됩니다.
+                ※ 최종 확정 시 프로젝트가 <b>완료(Completion)</b> 처리되며, 법인 및 담당자의 추가 수정이 차단됩니다.
               </div>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '4px' }}>
@@ -7162,7 +7162,7 @@ const Dashboard = () => {
                 </label>
                 <textarea
                   rows="3"
-                  placeholder="최종 확정 및 동결 의견을 입력하세요..."
+                  placeholder="최종 확정 및 완료 의견을 입력하세요..."
                   value={auditProjCommentInput}
                   onChange={(e) => setAuditProjCommentInput(e.target.value)}
                   style={{ ...styles.textarea, width: '100%' }}
@@ -7174,7 +7174,7 @@ const Dashboard = () => {
                 취소
               </button>
               <button onClick={handleConfirmLeaderProjApprove} style={{ ...styles.approveActionBtn, backgroundColor: '#059669' }}>
-                최종 확정 및 동결 (FREEZE) 실행
+                최종 확정 및 완료 (Completion) 실행
               </button>
             </div>
           </div>
