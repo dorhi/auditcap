@@ -66,6 +66,21 @@ public class FindingService {
     }
 
     /**
+     * 조치상태 코드 -> 한글명 변환
+     */
+    public String getActionStatusKoreanName(String code) {
+        if (code == null || code.trim().isEmpty()) return "미작성";
+        switch (code.trim().toUpperCase()) {
+            case "NOT_WRITTEN": return "미작성";
+            case "IN_PROGRESS": return "개선중";
+            case "COMPLETED": return "개선완료";
+            case "ACTION_IMPOSSIBLE": return "개선불가";
+            case "CONTINUOUS_MANAGEMENT": return "지속관리";
+            default: return code;
+        }
+    }
+
+    /**
      * 발견사항(지적사항) 목록 조회 (권한별 법인 및 유관부서 격리)
      */
     @Transactional(readOnly = true)
@@ -250,7 +265,7 @@ public class FindingService {
         }
 
         Finding saved = findingRepository.save(finding);
-        recordHistory(saved, "SAVE_DRAFT", "조치내역 임시저장 (상태: " + saved.getActionStatusCode() + ")", userInfo);
+        recordHistory(saved, "SAVE_DRAFT", "조치내역 임시저장 (상태: " + getActionStatusKoreanName(saved.getActionStatusCode()) + ")", userInfo);
         return saved;
     }
 

@@ -68,4 +68,9 @@ public class FindingHistory {
             this.createdAt = LocalDateTime.now();
         }
     }
+
+    // JSON 직렬화 시 actionAt 필드로도 제공 (프론트엔드 호환성)
+    public LocalDateTime getActionAt() {
+        return this.createdAt;
+    }
 }

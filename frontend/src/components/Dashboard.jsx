@@ -2859,7 +2859,7 @@ const Dashboard = () => {
                           {isAuditConfirmed && <span style={{ ...styles.badgeStatus, backgroundColor: '#dbeafe', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>감사담당자 확인완료 (조치종료)</span>}
 
                           <span style={f.project?.projectState === 'FREEZE' ? styles.badgeFreeze : styles.badgeOpen}>
-                            {f.project?.projectState}
+                            {f.project?.projectState === 'FREEZE' ? '동결 (FREEZE)' : '진행중 (OPEN)'}
                           </span>
                         </div>
                       </div>
@@ -2873,6 +2873,9 @@ const Dashboard = () => {
                             color: '#fff'
                           }}>1</div>
                           <span style={styles.timelineLabel}>법인담당자 조치</span>
+                          <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', whiteSpace: 'nowrap' }}>
+                            {f.updatedAt ? new Date(f.updatedAt).toLocaleDateString() : (f.createdAt ? new Date(f.createdAt).toLocaleDateString() : '-')}
+                          </span>
                         </div>
                         <div style={{ ...styles.timelineLine, backgroundColor: isPendingLead || isPendingAudit || isAuditConfirmed ? 'var(--saea-blue, #0077C8)' : '#cbd5e1' }} />
                         <div style={styles.timelineStep}>
@@ -2882,6 +2885,9 @@ const Dashboard = () => {
                             color: '#fff'
                           }}>2</div>
                           <span style={styles.timelineLabel}>대표담당자 확인</span>
+                          <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', whiteSpace: 'nowrap' }}>
+                            {f.leadApprovedAt ? new Date(f.leadApprovedAt).toLocaleDateString() : (isPendingLead ? '확인 진행중' : '-')}
+                          </span>
                         </div>
                         <div style={{ ...styles.timelineLine, backgroundColor: isAuditConfirmed ? 'var(--saea-blue, #0077C8)' : (isPendingAudit ? '#7c3aed' : '#cbd5e1') }} />
                         <div style={styles.timelineStep}>
@@ -2891,6 +2897,9 @@ const Dashboard = () => {
                             color: '#fff'
                           }}>3</div>
                           <span style={styles.timelineLabel}>감사실 검증</span>
+                          <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', whiteSpace: 'nowrap' }}>
+                            {isPendingAudit ? '검증 진행중' : (isAuditConfirmed ? '검증 완료' : '-')}
+                          </span>
                         </div>
                         <div style={{ ...styles.timelineLine, backgroundColor: isAuditConfirmed ? '#059669' : '#cbd5e1' }} />
                         <div style={styles.timelineStep}>
@@ -2899,7 +2908,10 @@ const Dashboard = () => {
                             backgroundColor: isAuditConfirmed ? '#059669' : '#94a3b8',
                             color: '#fff'
                           }}>4</div>
-                          <span style={styles.timelineLabel}>조치종료 (CONFIRM)</span>
+                          <span style={styles.timelineLabel}>조치종료</span>
+                          <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', whiteSpace: 'nowrap' }}>
+                            {f.auditReviewedAt ? new Date(f.auditReviewedAt).toLocaleDateString() : (isAuditConfirmed ? '완료' : '-')}
+                          </span>
                         </div>
                       </div>
 
@@ -3210,24 +3222,64 @@ const Dashboard = () => {
                         ) : findingHistories && findingHistories.length > 0 ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
                             {[...findingHistories].sort((a, b) => {
-                              const tA = new Date(a.actionAt || a.createdAt || 0).getTime();
-                              const tB = new Date(b.actionAt || b.createdAt || 0).getTime();
+                              const tA = new Date(a.createdAt || a.actionAt || 0).getTime();
+                              const tB = new Date(b.createdAt || b.actionAt || 0).getTime();
                               return tB - tA;
                             }).map((h, idx) => {
                               const getHistoryBadge = (actionType) => {
                                 switch (actionType) {
-                                  case 'UPDATE_ACTION': return { text: '조치 수정/임시저장', bg: '#f1f5f9', color: '#475569' };
-                                  case 'CONFIRM_MEMBER': return { text: '담당자 CONFIRM (제출)', bg: '#fef3c7', color: '#b45309' };
-                                  case 'CONFIRM_LEAD': return { text: '대표담당자 CONFIRM (제출)', bg: '#ede9fe', color: '#6d28d9' };
-                                  case 'REJECT_LEAD': return { text: '대표담당자 재수정요청', bg: '#fee2e2', color: '#b91c1c' };
-                                  case 'CONFIRM_AUDIT': return { text: '감사담당자 조치종료 CONFIRM', bg: '#dbeafe', color: '#1d4ed8' };
-                                  case 'REJECT_AUDIT': return { text: '감사실 재작성(보완)요청', bg: '#ffedd5', color: '#c2410c' };
-                                  case 'ADD_DEPT_CONTENT': return { text: '유관부서 내용 추가', bg: '#e0f2fe', color: '#0369a1' };
+                                  case 'SAVE_DRAFT': return { text: '조치 수정 / 임시저장', bg: '#f1f5f9', color: '#475569' };
+                                  case 'UPDATE_ACTION': return { text: '조치 수정 / 임시저장', bg: '#f1f5f9', color: '#475569' };
+                                  case 'CREATE_CAP': return { text: 'CAP 신규 등록', bg: '#eff6ff', color: '#1d4ed8' };
+                                  case 'UPDATE_CAP': return { text: 'CAP 지적사항 수정', bg: '#f1f5f9', color: '#475569' };
+                                  case 'CONFIRM_MEMBER': return { text: '법인담당자 제출', bg: '#fef3c7', color: '#b45309' };
+                                  case 'CONFIRM_LEAD': return { text: '대표담당자 확인 및 제출', bg: '#ede9fe', color: '#6d28d9' };
+                                  case 'REJECT_LEAD': return { text: '대표담당자 재수정요청 (반려)', bg: '#fee2e2', color: '#b91c1c' };
+                                  case 'CONFIRM_AUDIT': return { text: '감사담당자 조치종료 확인 (완료)', bg: '#dbeafe', color: '#1d4ed8' };
+                                  case 'REJECT_AUDIT': return { text: '감사실 재작성 (보완) 요청', bg: '#ffedd5', color: '#c2410c' };
+                                  case 'ADD_DEPT_CONTENT': return { text: '유관부서 협조내용 추가', bg: '#e0f2fe', color: '#0369a1' };
                                   case 'COPIED_FROM_PARENT': return { text: '이전 차수 승계 건', bg: '#eff6ff', color: '#1d4ed8' };
                                   default: return { text: actionType, bg: '#f1f5f9', color: '#334155' };
                                 }
                               };
                               const badge = getHistoryBadge(h.actionType);
+
+                              const getActionStatusKorean = (code) => {
+                                if (!code) return '';
+                                switch (code.trim().toUpperCase()) {
+                                  case 'NOT_WRITTEN': return '미작성';
+                                  case 'IN_PROGRESS': return '개선중';
+                                  case 'COMPLETED': return '개선완료';
+                                  case 'ACTION_IMPOSSIBLE': return '개선불가';
+                                  case 'CONTINUOUS_MANAGEMENT': return '업무개선 후 지속관리';
+                                  default: return code;
+                                }
+                              };
+
+                              const formatHistoryComment = (text) => {
+                                if (!text) return '';
+                                return text
+                                  .replace(/IN_PROGRESS/g, '개선중')
+                                  .replace(/COMPLETED/g, '개선완료')
+                                  .replace(/ACTION_IMPOSSIBLE/g, '개선불가')
+                                  .replace(/CONTINUOUS_MANAGEMENT/g, '업무개선 후 지속관리')
+                                  .replace(/NOT_WRITTEN/g, '미작성')
+                                  .replace(/PENDING_LEAD/g, '대표담당자 확인대기')
+                                  .replace(/PENDING_AUDIT/g, '감사실 검증대기')
+                                  .replace(/AUDIT_CONFIRMED/g, '조치종료');
+                              };
+
+                              const actionTime = h.createdAt || h.actionAt;
+                              const formattedDateTime = actionTime
+                                ? new Date(actionTime).toLocaleString('ko-KR', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit'
+                                  })
+                                : '-';
 
                               return (
                                 <div key={h.historyId || idx} style={{
@@ -3238,8 +3290,8 @@ const Dashboard = () => {
                                   boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                                   borderLeft: `4px solid ${badge.color}`
                                 }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                       <span style={{
                                         padding: '2px 8px',
                                         borderRadius: '12px',
@@ -3250,17 +3302,38 @@ const Dashboard = () => {
                                       }}>
                                         {badge.text}
                                       </span>
+                                      {h.actionStatusCode && (
+                                        <span style={{
+                                          padding: '2px 8px',
+                                          borderRadius: '4px',
+                                          fontSize: '11px',
+                                          fontWeight: 'bold',
+                                          backgroundColor: h.actionStatusCode === 'COMPLETED' ? '#dcfce7' : (h.actionStatusCode === 'IN_PROGRESS' ? '#fef3c7' : '#f1f5f9'),
+                                          color: h.actionStatusCode === 'COMPLETED' ? '#15803d' : (h.actionStatusCode === 'IN_PROGRESS' ? '#b45309' : '#475569'),
+                                          border: '1px solid #cbd5e1'
+                                        }}>
+                                          상태: {getActionStatusKorean(h.actionStatusCode)}
+                                        </span>
+                                      )}
                                       <strong style={{ fontSize: '13px', color: '#1e293b' }}>{h.actorName || h.actorUserId}</strong>
                                       <span style={{ fontSize: '11px', color: '#64748b' }}>({getRoleKoreanName(h.actorRole)})</span>
                                     </div>
-                                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                                      {h.actionAt ? new Date(h.actionAt).toLocaleString() : '-'}
+                                    <span style={{ fontSize: '12px', color: '#475569', fontWeight: 'bold' }}>
+                                      🕒 {formattedDateTime}
                                     </span>
                                   </div>
 
                                   {h.comment && (
-                                    <div style={{ fontSize: '12px', color: '#dc2626', backgroundColor: '#fef2f2', padding: '6px 10px', borderRadius: '4px', marginBottom: '6px' }}>
-                                      <strong>코멘트 / 사유:</strong> {h.comment}
+                                    <div style={{
+                                      fontSize: '12px',
+                                      color: (h.actionType === 'REJECT_LEAD' || h.actionType === 'REJECT_AUDIT') ? '#dc2626' : '#334155',
+                                      backgroundColor: (h.actionType === 'REJECT_LEAD' || h.actionType === 'REJECT_AUDIT') ? '#fef2f2' : '#f8fafc',
+                                      padding: '6px 10px',
+                                      borderRadius: '4px',
+                                      marginBottom: '6px',
+                                      border: '1px solid #e2e8f0'
+                                    }}>
+                                      <strong>{(h.actionType === 'REJECT_LEAD' || h.actionType === 'REJECT_AUDIT') ? '요청 사유:' : '기록 / 내용:'}</strong> {formatHistoryComment(h.comment)}
                                     </div>
                                   )}
 
