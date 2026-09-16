@@ -526,10 +526,7 @@ const Dashboard = () => {
         });
       }
 
-      // 테스트 편의상 첫 프로젝트 자동 선택 설정
-      if (projRes.data.length > 0 && !selectedProjectId) {
-        setSelectedProjectId(projRes.data[0].projectId.toString());
-      }
+      // 프로젝트는 사용자가 명시적으로 선택하기 전까지 미선택 상태 유지
     } catch (err) {
       console.error('백엔드 데이터 통신 실패 상세:', err);
       const detail = err.response?.data?.message || err.response?.statusText || err.message || '';
@@ -3517,13 +3514,17 @@ const Dashboard = () => {
             // 1. 대상 프로젝트 필터링 (기본: FREEZE 제외, 옵션 체크 시 FREEZE 포함)
             const selectableProjects = projects.filter(p => includeFrozenProjects || p.projectState !== 'FREEZE');
 
-            // 2. 현재 선택된 프로젝트의 등록된 CAP 목록 추출
-            const projectCaps = selectedProjectId
+            // 현재 선택된 프로젝트가 selectableProjects 목록에 실제로 존재하는지 엄격하게 검증 (미선택 또는 목록 부재 시 false)
+            const selectedProjectObj = selectableProjects.find(p => p.projectId.toString() === selectedProjectId?.toString());
+            const isProjectSelected = Boolean(selectedProjectId && selectedProjectObj);
+
+            // 2. 현재 유효하게 선택된 프로젝트의 등록된 CAP 목록 추출
+            const projectCaps = isProjectSelected
               ? findings.filter(f => f.project?.projectId == selectedProjectId)
               : [];
 
             // 3. 현재 선택된 CAP 객체 및 수정 가능 여부 판단
-            const currentCap = selectedCapId ? findings.find(f => f.findingId === selectedCapId) : null;
+            const currentCap = isProjectSelected && selectedCapId ? findings.find(f => f.findingId === selectedCapId) : null;
             const hasActionDone = currentCap && currentCap.actionText && currentCap.actionText.trim().length > 0;
             const isDraftStatus = !currentCap || currentCap.approvalStatus === 'DRAFT' || !currentCap.approvalStatus;
             const isProjectFrozen = currentCap?.project?.projectState === 'FREEZE';
@@ -3540,7 +3541,6 @@ const Dashboard = () => {
             );
 
             // 5. 대상 프로젝트 정보 및 해당 법인 소속 사용자 목록 추출
-            const selectedProjectObj = projects.find(p => p.projectId == selectedProjectId);
             const targetCorpId = selectedProjectObj?.corpId || '';
             const targetCorpUsers = usersList.filter(u => u.corpId === targetCorpId && u.enabled !== false);
             // 5-1. 해당 법인 소속 사용자의 고유 부서 목록 추출 (부서 선행 선택용)
@@ -3614,7 +3614,7 @@ const Dashboard = () => {
                     </label>
 
                     <select
-                      value={selectedProjectId}
+                      value={isProjectSelected ? selectedProjectId : ''}
                       onChange={(e) => {
                         setSelectedProjectId(e.target.value);
                         handleSelectCap(null); // 프로젝트 변경 시 CAP 선택 초기화
@@ -3634,14 +3634,21 @@ const Dashboard = () => {
                       <input
                         type="checkbox"
                         checked={includeFrozenProjects}
-                        onChange={(e) => setIncludeFrozenProjects(e.target.checked)}
+                        onChange={(e) => {
+                          const nextVal = e.target.checked;
+                          setIncludeFrozenProjects(nextVal);
+                          if (!nextVal && selectedProjectObj?.projectState === 'FREEZE') {
+                            setSelectedProjectId('');
+                            handleSelectCap(null);
+                          }
+                        }}
                       />
                       <span>동결(FREEZE) 포함</span>
                     </label>
                   </div>
 
-                  {/* 4) 대상 감사 프로젝트별 등록된 CAP 선택 항목 리스트 (프로젝트가 선택되었을 때만 표시) */}
-                  {selectedProjectId && (
+                  {/* 4) 대상 감사 프로젝트별 등록된 CAP 선택 항목 리스트 (프로젝트가 유효하게 선택되었을 때만 표시) */}
+                  {isProjectSelected && (
                     <div style={{
                       padding: '14px 16px',
                       backgroundColor: '#f1f5f9',
@@ -3797,8 +3804,8 @@ const Dashboard = () => {
                   )}
                 </div>
 
-                {/* 2. 하단 선택된 CAP 상세 및 수정 폼 카드 (대상 프로젝트가 선택되었을 때만 노출) */}
-                {selectedProjectId && (
+                {/* 2. 하단 선택된 CAP 상세 및 수정 폼 카드 (대상 프로젝트가 유효하게 선택되었을 때만 노출) */}
+                {isProjectSelected && (
                   <div style={styles.card}>
 
                     {/* 동결 프로젝트 또는 일반 사용자 읽기전용 시 간소 알림 */}
