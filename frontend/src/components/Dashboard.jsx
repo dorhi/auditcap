@@ -687,7 +687,56 @@ const Dashboard = () => {
     }
   };
 
-  const handleSelectCap = (cap) => {
+  // 프로젝트 생성 시 지정된 소속법인 사용자 및 유관부서 담당자 자동 추출 헬퍼 함수
+  const getProjectDefaultAssignedMembers = (projectObj) => {
+    if (!projectObj || !projectObj.assignedDepts) {
+      return { defaultCorpUsers: [], defaultDeptMembers: [] };
+    }
+
+    const rawDepts = projectObj.assignedDepts.trim();
+    if (!rawDepts) {
+      return { defaultCorpUsers: [], defaultDeptMembers: [] };
+    }
+
+    const ids = rawDepts.split(',').map(s => s.trim()).filter(Boolean);
+    const defaultCorpUsers = [];
+    const defaultDeptMembers = [];
+
+    ids.forEach(id => {
+      const userObj = usersList.find(u => u.username === id);
+      if (!userObj) {
+        // 사용자 정보 미조회 시 기본 사번으로 소속법인 대상자에 추가
+        defaultCorpUsers.push({
+          userId: id,
+          name: id,
+          deptName: ''
+        });
+        return;
+      }
+
+      // 유관부서(DEPT_MEMBER) 역할이거나 소속 법인이 프로젝트 대상 법인과 다른 경우 유관부서 협조 담당자로 분류
+      const isDeptMemberRole = userObj.role === 'DEPT_MEMBER';
+      const isDifferentCorp = userObj.corpId && projectObj.corpId && userObj.corpId !== projectObj.corpId;
+
+      if (isDeptMemberRole || isDifferentCorp) {
+        defaultDeptMembers.push({
+          deptName: userObj.deptName || '유관부서',
+          userName: userObj.name || id,
+          userId: id
+        });
+      } else {
+        defaultCorpUsers.push({
+          userId: id,
+          name: userObj.name || id,
+          deptName: userObj.deptName || ''
+        });
+      }
+    });
+
+    return { defaultCorpUsers, defaultDeptMembers };
+  };
+
+  const handleSelectCap = (cap, targetProject = null) => {
     if (!cap) {
       setSelectedCapId(null);
       setNewTitle('');
@@ -697,14 +746,20 @@ const Dashboard = () => {
       // 로그인 사용자가 감사팀인 경우 기본 담당 감사자로 자동 포함
       const defaultAuditor = user?.username && isAuditTeam ? [user.username] : [];
       setSelectedAuditors(defaultAuditor);
-      setSelectedAssignedUsers([]);
-      setAssignedUser('');
-      setAssignedDept('');
+
+      // 프로젝트 생성 시 지정된 소속법인 사용자 및 유관부서 담당자 자동 로드
+      const proj = targetProject || projects.find(p => p.projectId?.toString() === selectedProjectId?.toString());
+      const { defaultCorpUsers, defaultDeptMembers } = getProjectDefaultAssignedMembers(proj);
+
+      setSelectedAssignedUsers(defaultCorpUsers);
+      setAssignedUser(defaultCorpUsers.map(u => u.userId).join(','));
+      setAssignedDept(Array.from(new Set(defaultCorpUsers.map(u => u.deptName).filter(Boolean))).join(','));
       setAssignedDeptSelect('');
       setCustomAssignedDeptInput('');
       setAssignedUserSelect('');
       setCustomAssignedUserInput('');
-      setSelectedRelatedMembers([]);
+
+      setSelectedRelatedMembers(defaultDeptMembers);
       setRelatedDeptSelect('');
       setRelatedUserSelect('');
       setCustomRelatedDeptInput('');
@@ -805,6 +860,24 @@ const Dashboard = () => {
     setCapDeadline2nd(cap.deadline2nd ? cap.deadline2nd.substring(0, 10) : '');
     setCapDeadline3rd(cap.deadline3rd ? cap.deadline3rd.substring(0, 10) : '');
   };
+
+  // 3번 탭: 프로젝트 선택 후 신규 CAP 모드에서 담당자가 비어있는 경우 프로젝트 기본 담당자 자동 동기화
+  useEffect(() => {
+    if (activeMenu === 'FINDING_MANAGEMENT' && selectedProjectId && selectedCapId === null) {
+      if (selectedAssignedUsers.length === 0 && selectedRelatedMembers.length === 0) {
+        const proj = projects.find(p => p.projectId?.toString() === selectedProjectId?.toString());
+        if (proj) {
+          const { defaultCorpUsers, defaultDeptMembers } = getProjectDefaultAssignedMembers(proj);
+          if (defaultCorpUsers.length > 0 || defaultDeptMembers.length > 0) {
+            setSelectedAssignedUsers(defaultCorpUsers);
+            setAssignedUser(defaultCorpUsers.map(u => u.userId).join(','));
+            setAssignedDept(Array.from(new Set(defaultCorpUsers.map(u => u.deptName).filter(Boolean))).join(','));
+            setSelectedRelatedMembers(defaultDeptMembers);
+          }
+        }
+      }
+    }
+  }, [activeMenu, selectedProjectId, selectedCapId, projects, usersList]);
 
   // CAP 달성 대상자 추가/제거 핸들러 (상시 추가 지원)
   const handleAddAssignedUser = (userId, deptName, userName) => {
@@ -4045,8 +4118,10 @@ const Dashboard = () => {
                     <select
                       value={isProjectSelected ? selectedProjectId : ''}
                       onChange={(e) => {
-                        setSelectedProjectId(e.target.value);
-                        handleSelectCap(null); // 프로젝트 변경 시 CAP 선택 초기화
+                        const newId = e.target.value;
+                        setSelectedProjectId(newId);
+                        const chosenProj = selectableProjects.find(p => p.projectId.toString() === newId?.toString());
+                        handleSelectCap(null, chosenProj); // 프로젝트 변경 시 신규 등록 모드로 전환하며 해당 프로젝트의 소속법인/유관부서 담당자 자동 로드
                       }}
                       style={{ ...styles.select, flex: 1, minWidth: '300px', margin: 0, padding: '7px 10px', fontSize: '13px' }}
                       required
@@ -4091,7 +4166,10 @@ const Dashboard = () => {
                         </div>
                         <button
                           type="button"
-                          onClick={() => handleSelectCap(null)}
+                          onClick={() => {
+                            const chosenProj = selectableProjects.find(p => p.projectId.toString() === selectedProjectId?.toString());
+                            handleSelectCap(null, chosenProj); // 신규 CAP 등록 시 프로젝트 소속법인 및 유관부서 담당자 자동 로드
+                          }}
                           style={{
                             padding: '6px 14px',
                             backgroundColor: selectedCapId === null ? '#16a34a' : '#ffffff',
@@ -4400,6 +4478,9 @@ const Dashboard = () => {
                             {selectedAssignedUsers.length}명 지정됨
                           </span>
                         </div>
+                        <span style={{ fontSize: '12px', color: '#15803d', fontWeight: '500' }}>
+                          ※ 프로젝트 생성 시 지정된 소속법인 사용자가 자동으로 불러와집니다. 필요 시 [✕]로 삭제하거나 아래에서 추가할 수 있습니다.
+                        </span>
                       </div>
 
                       {/* 선택된 CAP 달성 대상자 태그 뱃지 리스트 */}
@@ -4463,7 +4544,7 @@ const Dashboard = () => {
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1'
                         }}>
-                          {/* 1단계: 소속 부서 선택 (직접입력란 삭제) */}
+                          {/* 1단계: 소속 부서 선택 */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 240px' }}>
                             <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#166534', marginBottom: 0 }}>
                               1단계: 소속 부서 선택
@@ -4477,6 +4558,7 @@ const Dashboard = () => {
                               style={{ ...styles.select, fontSize: '12px', padding: '6px 8px', borderColor: '#86efac' }}
                             >
                               <option value="">-- 부서 선택 ({targetCorpDepts.length}개) --</option>
+                              <option value="__ALL__">-- [전체 부서] 담당자 목록에서 바로 선택 ({targetCorpUsers.length}명) --</option>
                               {targetCorpDepts.map(d => (
                                 <option key={d} value={d}>
                                   {d} ({targetCorpUsers.filter(u => u.deptName === d).length}명)
@@ -4491,9 +4573,9 @@ const Dashboard = () => {
                               2단계: 담당자 선택
                             </label>
                             {(() => {
-                              const deptUsers = assignedDeptSelect
-                                ? targetCorpUsers.filter(u => u.deptName === assignedDeptSelect)
-                                : [];
+                              const deptUsers = assignedDeptSelect === '__ALL__'
+                                ? targetCorpUsers
+                                : (assignedDeptSelect ? targetCorpUsers.filter(u => u.deptName === assignedDeptSelect) : []);
 
                               return (
                                 <select
@@ -4514,10 +4596,10 @@ const Dashboard = () => {
                                     <option value="">해당 부서에 등록된 직원이 없습니다</option>
                                   ) : (
                                     <>
-                                      <option value="">-- [{assignedDeptSelect}] 담당자 선택 ({deptUsers.length}명) --</option>
+                                      <option value="">-- [{assignedDeptSelect === '__ALL__' ? '전체 부서' : assignedDeptSelect}] 담당자 선택 ({deptUsers.length}명) --</option>
                                       {deptUsers.map(u => (
                                         <option key={u.username} value={u.username}>
-                                          {u.name} (사번: {u.username}) - {getRoleKoreanName(u.role)}
+                                          {u.name} (사번: {u.username}) {u.deptName ? `[${u.deptName}]` : ''} - {getRoleKoreanName(u.role)}
                                         </option>
                                       ))}
                                     </>
@@ -4542,7 +4624,9 @@ const Dashboard = () => {
                                   setTimeout(() => setError(''), 3000);
                                   return;
                                 }
-                                handleAddAssignedUser(assignedUserSelect, assignedDeptSelect, '');
+                                const chosenUser = usersList.find(u => u.username === assignedUserSelect);
+                                const actualDept = assignedDeptSelect === '__ALL__' ? (chosenUser?.deptName || '') : assignedDeptSelect;
+                                handleAddAssignedUser(assignedUserSelect, actualDept, chosenUser?.name || '');
                               }}
                               style={{
                                 padding: '6px 14px',
@@ -4581,7 +4665,7 @@ const Dashboard = () => {
                           </span>
                         </div>
                         <span style={{ fontSize: '12px', color: '#0284c7', fontWeight: '500' }}>
-                          ※ 지적사항 해결을 위해 협업할 <b>유관부서와 해당 담당자</b>를 함께 지정할 수 있습니다.
+                          ※ 프로젝트 생성 시 지정된 유관부서 담당자가 자동으로 불러와집니다. 필요 시 [✕]로 삭제하거나 아래에서 추가할 수 있습니다.
                         </span>
                       </div>
 
@@ -4651,99 +4735,114 @@ const Dashboard = () => {
                           borderRadius: '6px',
                           border: '1px solid #cbd5e1'
                         }}>
-                          {/* 1단계: 유관부서 선택 (직접입력란 삭제) */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 240px' }}>
-                            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0369a1', marginBottom: 0 }}>
-                              1단계: 유관부서 선택
-                            </label>
-                            <select
-                              value={relatedDeptSelect}
-                              onChange={(e) => {
-                                setRelatedDeptSelect(e.target.value);
-                                setRelatedUserSelect(''); // 부서 변경 시 협조 담당자 초기화
-                              }}
-                              style={{ ...styles.select, fontSize: '12px', padding: '6px 8px' }}
-                            >
-                              <option value="">-- 유관부서 드롭다운 선택 ({targetCorpDepts.length}개) --</option>
-                              {targetCorpDepts.map(d => (
-                                <option key={d} value={d}>{d}</option>
-                              ))}
-                            </select>
-                          </div>
+                          {/* 1단계: 유관부서 선택 (전체 등록 부서 및 전체 선택 지원) */}
+                          {(() => {
+                            const allAvailableDepts = Array.from(new Set([
+                              ...targetCorpDepts,
+                              ...usersList.map(u => u.deptName).filter(Boolean)
+                            ])).sort();
+                            const allDeptMemberUsers = usersList.filter(u => u.role === 'DEPT_MEMBER' || (targetCorpId && u.corpId !== targetCorpId));
 
-                          {/* 2단계: 유관부서 협조 담당자 선택 (선택된 부서 소속 직원만 표시) */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 280px' }}>
-                            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0369a1', marginBottom: 0 }}>
-                              2단계: 협조 담당자 선택 (필수)
-                            </label>
-                            {(() => {
-                              const deptUsers = relatedDeptSelect
-                                ? usersList.filter(u => u.deptName === relatedDeptSelect)
-                                : [];
+                            return (
+                              <>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 240px' }}>
+                                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0369a1', marginBottom: 0 }}>
+                                    1단계: 유관부서 선택
+                                  </label>
+                                  <select
+                                    value={relatedDeptSelect}
+                                    onChange={(e) => {
+                                      setRelatedDeptSelect(e.target.value);
+                                      setRelatedUserSelect(''); // 부서 변경 시 협조 담당자 초기화
+                                    }}
+                                    style={{ ...styles.select, fontSize: '12px', padding: '6px 8px' }}
+                                  >
+                                    <option value="">-- 유관부서 선택 ({allAvailableDepts.length}개) --</option>
+                                    <option value="__ALL__">-- [전체 유관부서] 협조 담당자 목록에서 바로 선택 ({allDeptMemberUsers.length}명) --</option>
+                                    {allAvailableDepts.map(d => (
+                                      <option key={d} value={d}>{d}</option>
+                                    ))}
+                                  </select>
+                                </div>
 
-                              return (
-                                <select
-                                  value={relatedUserSelect}
-                                  onChange={(e) => setRelatedUserSelect(e.target.value)}
-                                  disabled={!relatedDeptSelect}
-                                  style={{
-                                    ...styles.select,
-                                    fontSize: '12px',
-                                    padding: '6px 8px',
-                                    backgroundColor: relatedDeptSelect ? '#ffffff' : '#f1f5f9'
-                                  }}
-                                >
-                                  {!relatedDeptSelect ? (
-                                    <option value="">-- 먼저 1단계 유관부서를 선택해 주세요 --</option>
-                                  ) : deptUsers.length === 0 ? (
-                                    <option value="">해당 부서에 등록된 직원이 없습니다</option>
-                                  ) : (
-                                    <>
-                                      <option value="">-- [{relatedDeptSelect}] 협조 담당자 선택 ({deptUsers.length}명) --</option>
-                                      {deptUsers.map(u => (
-                                        <option key={u.username} value={u.username}>
-                                          {u.name} (사번: {u.username})
-                                        </option>
-                                      ))}
-                                    </>
-                                  )}
-                                </select>
-                              );
-                            })()}
-                          </div>
+                                {/* 2단계: 유관부서 협조 담당자 선택 (선택된 부서 소속 직원만 표시) */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 280px' }}>
+                                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0369a1', marginBottom: 0 }}>
+                                    2단계: 협조 담당자 선택 (필수)
+                                  </label>
+                                  {(() => {
+                                    const deptUsers = relatedDeptSelect === '__ALL__'
+                                      ? allDeptMemberUsers
+                                      : (relatedDeptSelect ? usersList.filter(u => u.deptName === relatedDeptSelect) : []);
 
-                          {/* 유관부서 및 담당자 추가 버튼 */}
-                          <div style={{ display: 'flex', alignItems: 'flex-end', paddingTop: '20px' }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!relatedDeptSelect) {
-                                  setError('유관부서를 먼저 선택해 주세요.');
-                                  setTimeout(() => setError(''), 3000);
-                                  return;
-                                }
-                                if (!relatedUserSelect) {
-                                  setError('유관부서의 협조 담당자를 선택해 주세요.');
-                                  setTimeout(() => setError(''), 3000);
-                                  return;
-                                }
-                                handleAddRelatedMember(relatedDeptSelect, relatedUserSelect, '');
-                              }}
-                              style={{
-                                padding: '6px 14px',
-                                fontSize: '12px',
-                                fontWeight: 'bold',
-                                backgroundColor: '#0284c7',
-                                color: '#ffffff',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              협조 담당자 추가
-                            </button>
-                          </div>
+                                    return (
+                                      <select
+                                        value={relatedUserSelect}
+                                        onChange={(e) => setRelatedUserSelect(e.target.value)}
+                                        disabled={!relatedDeptSelect}
+                                        style={{
+                                          ...styles.select,
+                                          fontSize: '12px',
+                                          padding: '6px 8px',
+                                          backgroundColor: relatedDeptSelect ? '#ffffff' : '#f1f5f9'
+                                        }}
+                                      >
+                                        {!relatedDeptSelect ? (
+                                          <option value="">-- 먼저 1단계 유관부서를 선택해 주세요 --</option>
+                                        ) : deptUsers.length === 0 ? (
+                                          <option value="">해당 부서에 등록된 직원이 없습니다</option>
+                                        ) : (
+                                          <>
+                                            <option value="">-- [{relatedDeptSelect === '__ALL__' ? '전체 유관부서' : relatedDeptSelect}] 협조 담당자 선택 ({deptUsers.length}명) --</option>
+                                            {deptUsers.map(u => (
+                                              <option key={u.username} value={u.username}>
+                                                {u.name} (사번: {u.username}) {u.deptName ? `[${u.deptName}]` : ''} - {u.corpId}
+                                              </option>
+                                            ))}
+                                          </>
+                                        )}
+                                      </select>
+                                    );
+                                  })()}
+                                </div>
+
+                                {/* 유관부서 및 담당자 추가 버튼 */}
+                                <div style={{ display: 'flex', alignItems: 'flex-end', paddingTop: '20px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!relatedDeptSelect) {
+                                        setError('유관부서를 먼저 선택해 주세요.');
+                                        setTimeout(() => setError(''), 3000);
+                                        return;
+                                      }
+                                      if (!relatedUserSelect) {
+                                        setError('유관부서의 협조 담당자를 선택해 주세요.');
+                                        setTimeout(() => setError(''), 3000);
+                                        return;
+                                      }
+                                      const chosenUser = usersList.find(u => u.username === relatedUserSelect);
+                                      const actualDept = relatedDeptSelect === '__ALL__' ? (chosenUser?.deptName || '유관부서') : relatedDeptSelect;
+                                      handleAddRelatedMember(actualDept, relatedUserSelect, chosenUser?.name || '');
+                                    }}
+                                    style={{
+                                      padding: '6px 14px',
+                                      fontSize: '12px',
+                                      fontWeight: 'bold',
+                                      backgroundColor: '#0284c7',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    협조 담당자 추가
+                                  </button>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
