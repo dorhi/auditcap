@@ -385,6 +385,10 @@ const Dashboard = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [deptAdditionalContent, setDeptAdditionalContent] = useState('');
   const [selectedFinalProjectId, setSelectedFinalProjectId] = useState(null);
+  const [selectedFinalFindingId, setSelectedFinalFindingId] = useState(null);
+  const [finalProjectFilterCorp, setFinalProjectFilterCorp] = useState('');
+  const [finalProjectFilterStatus, setFinalProjectFilterStatus] = useState('ALL');
+  const [finalProjectSearchText, setFinalProjectSearchText] = useState('');
 
   // 결재선(승인/반려) 관련 상태
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -1472,22 +1476,42 @@ const Dashboard = () => {
     }
   };
 
-  // [프로젝트 최종 결재] 3단계: 감사책임자 최종 CONFIRM & FREEZE
+  // [프로젝트 최종 결재] 3단계: 감사팀 최종 CONFIRM & FREEZE
   const handleLeaderConfirmFreezeProject = async (projectId) => {
     setError('');
     setMessage('');
-    if (!window.confirm('감사책임자 최종 승인을 진행하시겠습니까? 승인 시 프로젝트가 동결(FREEZE)되어 더 이상 수정할 수 없습니다.')) {
+    if (!window.confirm('감사팀 최종 승인을 진행하시겠습니까? 승인 시 프로젝트가 동결(FREEZE)되어 더 이상 수정할 수 없습니다.')) {
       return;
     }
-    const comment = window.prompt('감사책임자 최종 승인 의견(선택 사항):');
+    const comment = window.prompt('감사팀 최종 승인 및 동결 의견(선택 사항):', '감사팀 최종 승인 및 동결 완료');
     if (comment === null) return;
 
     try {
       const res = await axios.post(`/api/projects/${projectId}/leader-approve`, { comment });
-      setMessage(res.data.message || '감사책임자 최종 승인이 완료되어 프로젝트가 동결(FREEZE)되었습니다.');
+      setMessage(res.data.message || '감사팀 최종 승인이 완료되어 프로젝트가 동결(FREEZE)되었습니다.');
       loadData();
     } catch (err) {
-      setError(err.response?.data?.message || '감사책임자 최종 승인 실패');
+      setError(err.response?.data?.message || '감사팀 최종 승인 및 동결 실패');
+    }
+  };
+
+  // [증빙 파일 다운로드] 첨부파일 안전 다운로드
+  const handleDownloadFile = async (fileId, fileName) => {
+    try {
+      const res = await axios.get(`/api/findings/attachments/${fileId}/download`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName || '증빙자료');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('파일 다운로드 실패:', err);
+      alert('파일 다운로드 중 오류가 발생했습니다.');
     }
   };
 
@@ -3383,9 +3407,9 @@ const Dashboard = () => {
                                   border: '1px solid #fecaca'
                                 }}>
                                   {isProjectFrozen
-                                    ? '동결(Freeze) 상태 (업로드 차단)'
+                                    ? '동결(Freeze) 상태'
                                     : isAuditConfirmed
-                                      ? '감사 검증완료/종료 (업로드 마감)'
+                                      ? '감사 검증완료/종료'
                                       : isPendingAudit
                                         ? '감사실 제출 완료'
                                         : '개선불가 상태'}
@@ -5933,16 +5957,58 @@ const Dashboard = () => {
           )}
 
           {/* ================================================================= */}
-          {/* 8번 탭: 법인장 최종 확정 결재 (프로젝트 종합 확정 및 동결 워크플로우) */}
+          {/* 8번 탭: 법인장 최종 확정 결재 (프로젝트 종합 검증/CONFIRM 및 감사팀 FREEZE) */}
           {/* ================================================================= */}
           {isMenuActive('HEAD_FINAL_APPROVAL') && (() => {
-            // 법인장인 경우 자기 법인만, 감사팀/관리자는 전체 프로젝트 열람 가능
-            const visibleProjects = projects.filter(p => {
-              if (user.role === 'CORP_HEAD') return p.corpId === user.corpId;
+            const isHead = user?.role === 'CORP_HEAD';
+            const userCorp = user?.corpId || '';
+
+            // 1. 프로젝트 단위 조회 필터링
+            const filteredProjects = projects.filter(p => {
+              // 법인장 권한: 본인 소속 법인만 열람 가능
+              if (isHead) {
+                if (p.corpId !== userCorp) return false;
+              } else if (finalProjectFilterCorp) {
+                if (p.corpId !== finalProjectFilterCorp) return false;
+              }
+
+              // 검색어 필터 (프로젝트명, 법인명)
+              if (finalProjectSearchText.trim()) {
+                const query = finalProjectSearchText.trim().toLowerCase();
+                const matchName = (p.projectName || '').toLowerCase().includes(query);
+                const matchCorp = (p.corpId || '').toLowerCase().includes(query);
+                if (!matchName && !matchCorp) return false;
+              }
+
+              // 결재/진행 상태 필터
+              if (finalProjectFilterStatus && finalProjectFilterStatus !== 'ALL') {
+                const pCaps = findings.filter(f => f.project?.projectId === p.projectId);
+                const pTotal = pCaps.length;
+                const pConfirmed = pCaps.filter(f => (f.actionPlanStatus || f.approvalStatus) === 'AUDIT_CONFIRMED').length;
+                const isReady = pTotal > 0 && pConfirmed === pTotal;
+                const isFreeze = p.projectState === 'FREEZE';
+                const isHeadConfirmed = Boolean(p.headConfirmedBy || p.auditApprovalStatus === 'HEAD_CONFIRMED');
+
+                if (finalProjectFilterStatus === 'FREEZE') {
+                  if (!isFreeze) return false;
+                } else if (finalProjectFilterStatus === 'CONFIRMED') {
+                  if (!isHeadConfirmed || isFreeze) return false;
+                } else if (finalProjectFilterStatus === 'READY') {
+                  if (!isReady || isHeadConfirmed || isFreeze) return false;
+                } else if (finalProjectFilterStatus === 'IN_PROGRESS') {
+                  if (isReady || isHeadConfirmed || isFreeze) return false;
+                }
+              }
+
               return true;
             });
 
-            const currentProj = visibleProjects.find(p => p.projectId === selectedFinalProjectId) || visibleProjects[0];
+            // 현재 선택된 프로젝트
+            const currentProj = filteredProjects.find(p => p.projectId === selectedFinalProjectId)
+              || filteredProjects[0]
+              || null;
+
+            // 선택된 프로젝트의 지적사항(CAP) 목록
             const currentProjCaps = currentProj
               ? findings.filter(f => f.project?.projectId === currentProj.projectId)
               : [];
@@ -5951,16 +6017,51 @@ const Dashboard = () => {
             const auditConfirmedCapsCount = currentProjCaps.filter(f => (f.actionPlanStatus || f.approvalStatus) === 'AUDIT_CONFIRMED').length;
             const isAllAuditConfirmed = totalCapsCount > 0 && auditConfirmedCapsCount === totalCapsCount;
 
+            // 현재 선택된 발견사항 (CAP)
+            const currentFinding = currentProjCaps.find(f => f.findingId === selectedFinalFindingId)
+              || currentProjCaps[0]
+              || null;
+
+            // 프로젝트 선택 변경 핸들러
+            const handleSelectProject = (projId) => {
+              setSelectedFinalProjectId(projId);
+              const caps = findings.filter(f => f.project?.projectId === projId);
+              if (caps.length > 0) {
+                const firstCapId = caps[0].findingId;
+                setSelectedFinalFindingId(firstCapId);
+                fetchFindingAttachments(firstCapId);
+                fetchFindingHistories(firstCapId);
+              } else {
+                setSelectedFinalFindingId(null);
+                setFindingHistories([]);
+              }
+            };
+
+            // 발견사항(CAP) 선택 핸들러
+            const handleSelectFinding = (findingId) => {
+              setSelectedFinalFindingId(findingId);
+              fetchFindingAttachments(findingId);
+              fetchFindingHistories(findingId);
+            };
+
+            // 선택된 CAP의 첨부파일 및 이력
+            const currentAttachments = (currentFinding && findingAttachments[currentFinding.findingId]) || [];
+            const currentHistories = findingHistories || [];
+
+            // 고유 법인 목록 (필터 드롭다운용)
+            const uniqueCorps = Array.from(new Set(projects.map(p => p.corpId).filter(Boolean)));
+
             return (
               <div style={styles.containerCol}>
+                {/* 상단 타이틀 & 안내 헤더 */}
                 <div style={styles.card}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>🏛️</span> 법인장 최종 확정 결재 (프로젝트 종합 보고)
+                        <span>🏛️</span> 법인장 감사 결과 검증 및 최종 확정 (CONFIRM) / 감사팀 동결 (FREEZE)
                       </h3>
                       <p style={styles.cardSubtitle}>
-                        해당 법인의 모든 지적사항(CAP)에 대하여 감사실 검증(CONFIRM)이 완료된 후, 법인장이 전체 조치 결과를 검토하고 최종 확정(CONFIRM)합니다.
+                        프로젝트별 발견사항(CAP)의 조치 및 감사 검증 결과를 종합 검토하고 법인장 최종 확정(CONFIRM)을 진행합니다. 모든 발견사항이 조치 완료된 경우에만 확정할 수 있으며, 감사팀은 확정 완료 건을 조회하여 최종 동결(FREEZE)합니다.
                       </p>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -5969,281 +6070,690 @@ const Dashboard = () => {
                       </button>
                     </div>
                   </div>
+
+                  {/* 1. 프로젝트 단위 검색 및 필터 영역 */}
+                  <div style={{ marginTop: '16px', padding: '14px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                    {/* 법인 선택 필터 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>소속 법인:</label>
+                      {isHead ? (
+                        <div style={{ padding: '6px 12px', backgroundColor: '#e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', color: '#334155' }}>
+                          🏢 {userCorp} (본인 법인 고정)
+                        </div>
+                      ) : (
+                        <select
+                          value={finalProjectFilterCorp}
+                          onChange={(e) => setFinalProjectFilterCorp(e.target.value)}
+                          style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff' }}
+                        >
+                          <option value="">전체 법인 ({uniqueCorps.length}개)</option>
+                          {uniqueCorps.map(corp => (
+                            <option key={corp} value={corp}>{corp}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    {/* 결재/진행 상태 필터 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>결재 상태:</label>
+                      <select
+                        value={finalProjectFilterStatus}
+                        onChange={(e) => setFinalProjectFilterStatus(e.target.value)}
+                        style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff' }}
+                      >
+                        <option value="ALL">전체 상태</option>
+                        <option value="READY">⏳ 확정 대기 (전체 CAP 검증완료 건)</option>
+                        <option value="CONFIRMED">🏛️ 법인장 확정 완료 건</option>
+                        <option value="FREEZE">🔒 최종 동결 (FREEZE) 완료 건</option>
+                        <option value="IN_PROGRESS">진행중 (검증 미완료 건)</option>
+                      </select>
+                    </div>
+
+                    {/* 프로젝트 검색어 필터 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '220px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>검색어:</label>
+                      <input
+                        type="text"
+                        placeholder="프로젝트명 검색..."
+                        value={finalProjectSearchText}
+                        onChange={(e) => setFinalProjectSearchText(e.target.value)}
+                        style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                      />
+                      {finalProjectSearchText && (
+                        <button
+                          onClick={() => setFinalProjectSearchText('')}
+                          style={{ padding: '4px 8px', backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      조회 결과: <b>{filteredProjects.length}</b>건
+                    </div>
+                  </div>
                 </div>
 
-                {visibleProjects.length === 0 ? (
-                  <div style={styles.noDataBox}>열람 가능한 프로젝트가 없습니다.</div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '20px', alignItems: 'start' }}>
-                    {/* 좌측: 프로젝트 목록 */}
-                    <div style={{ ...styles.card, padding: '16px' }}>
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#475569', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
-                        📋 프로젝트 목록 ({visibleProjects.length}개)
-                      </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '650px', overflowY: 'auto' }}>
-                        {visibleProjects.map(p => {
-                          const pCaps = findings.filter(f => f.project?.projectId === p.projectId);
-                          const pTotal = pCaps.length;
-                          const pConfirmed = pCaps.filter(f => (f.actionPlanStatus || f.approvalStatus) === 'AUDIT_CONFIRMED').length;
-                          const isReady = pTotal > 0 && pConfirmed === pTotal;
-                          const isSelected = (currentProj?.projectId === p.projectId);
+                {/* 1. 프로젝트 단위 그리드 (테이블) */}
+                <div style={styles.card}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h4 style={{ margin: 0, fontSize: '15px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>📋</span> 감사 프로젝트 목록 ({filteredProjects.length}건)
+                    </h4>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>
+                      ※ 프로젝트 행을 클릭하면 하단에 지적사항(CAP) 서브 그리드가 표시됩니다.
+                    </span>
+                  </div>
 
-                          return (
-                            <div
-                              key={p.projectId}
-                              onClick={() => setSelectedFinalProjectId(p.projectId)}
-                              style={{
-                                padding: '14px',
-                                borderRadius: '8px',
-                                border: isSelected ? '2px solid #0077C8' : '1px solid #e2e8f0',
-                                backgroundColor: isSelected ? '#f0f9ff' : '#fff',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                                boxShadow: isSelected ? '0 2px 6px rgba(0,119,200,0.15)' : 'none'
-                              }}
-                            >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                <span style={{ ...styles.badgeCategory, fontSize: '11px' }}>{p.corpId}</span>
-                                {p.projectState === 'FREEZE' ? (
-                                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 6px', borderRadius: '4px' }}>🔒 최종동결</span>
-                                ) : p.auditorReviewedBy ? (
-                                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>감사확인됨</span>
-                                ) : p.headConfirmedBy ? (
-                                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#7c3aed', backgroundColor: '#f5f3ff', padding: '2px 6px', borderRadius: '4px' }}>법인장확정됨</span>
-                                ) : isReady ? (
-                                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#d97706', backgroundColor: '#fffbeb', padding: '2px 6px', borderRadius: '4px' }}>⏳ 확정대기</span>
-                                ) : (
-                                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>진행중</span>
-                                )}
-                              </div>
-                              <strong style={{ fontSize: '14px', color: isSelected ? '#0077C8' : '#1e293b', display: 'block', marginBottom: '6px' }}>
-                                {p.projectName}
-                              </strong>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b' }}>
-                                <span>조치 완료율:</span>
-                                <span style={{ fontWeight: 'bold', color: isReady ? '#16a34a' : '#d97706' }}>
-                                  {pConfirmed} / {pTotal} 건 ({pTotal > 0 ? Math.round((pConfirmed / pTotal) * 100) : 0}%)
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
+                  {filteredProjects.length === 0 ? (
+                    <div style={styles.noDataBox}>조건에 부합하는 감사 프로젝트가 없습니다.</div>
+                  ) : (
+                    <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                        <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                          <tr>
+                            <th style={{ padding: '10px 12px', width: '50px', textAlign: 'center' }}>선택</th>
+                            <th style={{ padding: '10px 12px', width: '100px' }}>소속 법인</th>
+                            <th style={{ padding: '10px 12px' }}>감사 프로젝트명</th>
+                            <th style={{ padding: '10px 12px', width: '60px', textAlign: 'center' }}>차수</th>
+                            <th style={{ padding: '10px 12px', width: '110px' }}>마감기한</th>
+                            <th style={{ padding: '10px 12px', width: '180px' }}>CAP 검증 진행률</th>
+                            <th style={{ padding: '10px 12px', width: '150px', textAlign: 'center' }}>법인장 확정 상태</th>
+                            <th style={{ padding: '10px 12px', width: '110px', textAlign: 'center' }}>프로젝트 상태</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredProjects.map(p => {
+                            const pCaps = findings.filter(f => f.project?.projectId === p.projectId);
+                            const pTotal = pCaps.length;
+                            const pConfirmed = pCaps.filter(f => (f.actionPlanStatus || f.approvalStatus) === 'AUDIT_CONFIRMED').length;
+                            const isReady = pTotal > 0 && pConfirmed === pTotal;
+                            const isSelected = (currentProj?.projectId === p.projectId);
+                            const isFreeze = p.projectState === 'FREEZE';
+                            const isHeadConfirmed = Boolean(p.headConfirmedBy || p.auditApprovalStatus === 'HEAD_CONFIRMED');
+                            const percent = pTotal > 0 ? Math.round((pConfirmed / pTotal) * 100) : 0;
+
+                            return (
+                              <tr
+                                key={p.projectId}
+                                onClick={() => handleSelectProject(p.projectId)}
+                                style={{
+                                  backgroundColor: isSelected ? '#eff6ff' : '#fff',
+                                  cursor: 'pointer',
+                                  borderBottom: '1px solid #e2e8f0',
+                                  transition: 'background-color 0.15s ease'
+                                }}
+                              >
+                                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                  <input
+                                    type="radio"
+                                    name="selectedFinalProject"
+                                    checked={isSelected}
+                                    onChange={() => handleSelectProject(p.projectId)}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                </td>
+                                <td style={{ padding: '10px 12px' }}>
+                                  <span style={{ ...styles.badgeCategory, fontSize: '11px', fontWeight: 'bold' }}>
+                                    {p.corpId}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '10px 12px' }}>
+                                  <strong style={{ color: isSelected ? '#0077C8' : '#1e293b', fontSize: '14px' }}>
+                                    {p.projectName}
+                                  </strong>
+                                </td>
+                                <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 'bold', color: '#475569' }}>
+                                  {p.round ? `${p.round}차` : '1차'}
+                                </td>
+                                <td style={{ padding: '10px 12px', color: '#64748b' }}>
+                                  {p.deadline1st ? p.deadline1st.substring(0, 10) : '-'}
+                                </td>
+                                <td style={{ padding: '10px 12px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ flex: 1, backgroundColor: '#e2e8f0', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                                      <div
+                                        style={{
+                                          width: `${percent}%`,
+                                          backgroundColor: isReady ? '#16a34a' : '#0077C8',
+                                          height: '100%',
+                                          borderRadius: '4px',
+                                          transition: 'width 0.3s ease'
+                                        }}
+                                      />
+                                    </div>
+                                    <span style={{ fontSize: '12px', fontWeight: 'bold', color: isReady ? '#16a34a' : '#334155', minWidth: '70px', textAlign: 'right' }}>
+                                      {pConfirmed}/{pTotal}건 ({percent}%)
+                                    </span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                  {isHeadConfirmed ? (
+                                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#16a34a', backgroundColor: '#dcfce7', padding: '3px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                                      ✓ 확정 완료 ({p.headConfirmedBy})
+                                    </span>
+                                  ) : isReady ? (
+                                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#d97706', backgroundColor: '#fffbeb', padding: '3px 8px', borderRadius: '4px', display: 'inline-block', border: '1px solid #fde68a' }}>
+                                      ⏳ 확정 대기 (완료 가능)
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: '11px', color: '#64748b', backgroundColor: '#f1f5f9', padding: '3px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                                      진행중 ({pTotal - pConfirmed}건 미완료)
+                                    </span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                  {isFreeze ? (
+                                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#047857', backgroundColor: '#d1fae5', padding: '3px 8px', borderRadius: '4px' }}>
+                                      🔒 동결(FREEZE)
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#0284c7', backgroundColor: '#e0f2fe', padding: '3px 8px', borderRadius: '4px' }}>
+                                      OPEN
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2 & 4 & 5. 선택된 프로젝트 결재 종합 패널 */}
+                {currentProj && (
+                  <div style={{ ...styles.card, border: '2px solid #0077C8', backgroundColor: '#fafcff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', borderBottom: '1px solid #dbeafe', paddingBottom: '14px', marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <span style={{ ...styles.badgeCategory, fontSize: '13px', padding: '4px 10px' }}>{currentProj.corpId}</span>
+                        <h3 style={{ margin: 0, fontSize: '18px', color: '#0f172a' }}>
+                          {currentProj.projectName}
+                        </h3>
+                        <span style={{ fontSize: '13px', color: '#64748b' }}>
+                          (차수: {currentProj.round ? `${currentProj.round}차` : '1차'} / 마감: {currentProj.deadline1st ? currentProj.deadline1st.substring(0, 10) : '-'})
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={currentProj.projectState === 'FREEZE' ? styles.badgeFreeze : styles.badgeOpen}>
+                          {currentProj.projectState === 'FREEZE' ? '🔒 프로젝트 동결 (FREEZE)' : '🟢 진행중 (OPEN)'}
+                        </span>
+                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: isAllAuditConfirmed ? '#16a34a' : '#dc2626', backgroundColor: isAllAuditConfirmed ? '#dcfce7' : '#fee2e2', padding: '4px 10px', borderRadius: '6px' }}>
+                          지적사항 검증: {auditConfirmedCapsCount} / {totalCapsCount}건 ({isAllAuditConfirmed ? '100% 완료' : `${totalCapsCount - auditConfirmedCapsCount}건 미완료`})
+                        </span>
                       </div>
                     </div>
 
-                    {/* 우측: 선택된 프로젝트 종합 리포트 및 결재 액션 */}
-                    {currentProj && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {/* 프로젝트 기본 정보 헤더 */}
-                        <div style={styles.card}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                            <div>
-                              <span style={{ ...styles.badgeCategory, marginRight: '8px' }}>{currentProj.corpId}</span>
-                              <h3 style={{ display: 'inline', fontSize: '17px', color: '#0f172a' }}>{currentProj.projectName}</h3>
-                            </div>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              <span style={currentProj.projectState === 'FREEZE' ? styles.badgeFreeze : styles.badgeOpen}>
-                                {currentProj.projectState}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div style={{ ...styles.infoGrid, gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                            <p><strong>소속 법인:</strong> {currentProj.corpId}</p>
-                            <p><strong>감사 시작/마감:</strong> {currentProj.deadline1st ? currentProj.deadline1st.substring(0, 10) : '-'}</p>
-                            <p><strong>CAP 검증 완료율:</strong> <b style={{ color: isAllAuditConfirmed ? '#16a34a' : '#dc2626' }}>
-                              {auditConfirmedCapsCount} / {totalCapsCount}건 ({isAllAuditConfirmed ? '100% 완료' : '진행중'})
-                            </b></p>
-                          </div>
-
-                          {/* 3단계 종합 결재 액션 바 */}
-                          <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                            <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#1e293b' }}>
-                              🏛️ 프로젝트 종합 3단계 결재 진행 현황
+                    {/* 종합 결재 및 동결(FREEZE) 액션 바 */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'stretch' }}>
+                      {/* 좌측: [요구사항 4] 법인장 최종 확정 (CONFIRM) 영역 */}
+                      <div style={{ padding: '16px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <h4 style={{ margin: 0, fontSize: '14px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>🏛️</span> [1단계] 법인장 최종 확정 (CONFIRM)
                             </h4>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                              {/* 1단계: 법인장 최종 확정 */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                <div>
-                                  <strong style={{ fontSize: '13px', color: '#334155' }}>1단계: 법인장 최종 확정 (CONFIRM)</strong>
-                                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                                    {currentProj.headConfirmedBy ? (
-                                      <span style={{ color: '#059669', fontWeight: 'bold' }}>
-                                        ✓ 완료 ({currentProj.headConfirmedBy} - {currentProj.headConfirmedAt ? new Date(currentProj.headConfirmedAt).toLocaleString() : ''})
-                                        {currentProj.headComment && ` [의견: ${currentProj.headComment}]`}
-                                      </span>
-                                    ) : isAllAuditConfirmed ? (
-                                      <span style={{ color: '#d97706' }}>모든 CAP 감사 검증 완료 ➔ 법인장 최종 확정 대기 중</span>
-                                    ) : (
-                                      <span style={{ color: '#dc2626' }}>※ 모든 지적사항(CAP) 감사 검증 완료 후 활성화됩니다.</span>
-                                    )}
-                                  </div>
-                                </div>
-                                {(user.role === 'CORP_HEAD' || user.role === 'SYSTEM_ADMIN') && !currentProj.headConfirmedBy && (
-                                  <button
-                                    onClick={() => handleHeadConfirmProject(currentProj.projectId)}
-                                    disabled={!isAllAuditConfirmed}
-                                    style={{
-                                      padding: '8px 16px',
-                                      backgroundColor: isAllAuditConfirmed ? 'var(--saea-blue, #0077C8)' : '#cbd5e1',
-                                      color: '#fff',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      cursor: isAllAuditConfirmed ? 'pointer' : 'not-allowed',
-                                      fontWeight: 'bold',
-                                      fontSize: '13px'
-                                    }}
-                                  >
-                                    🏛️ 법인장 최종 확정
-                                  </button>
-                                )}
-                              </div>
+                            {currentProj.headConfirmedBy ? (
+                              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '4px' }}>
+                                ✓ 확정 완료
+                              </span>
+                            ) : isAllAuditConfirmed ? (
+                              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#d97706', backgroundColor: '#fffbeb', padding: '2px 8px', borderRadius: '4px' }}>
+                                ⏳ 확정 가능
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '12px', color: '#dc2626', backgroundColor: '#fee2e2', padding: '2px 8px', borderRadius: '4px' }}>
+                                확정 불가
+                              </span>
+                            )}
+                          </div>
 
-                              {/* 2단계: 감사담당자 확인 CONFIRM */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                <div>
-                                  <strong style={{ fontSize: '13px', color: '#334155' }}>2단계: 감사담당자 확인 (CONFIRM)</strong>
-                                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                                    {currentProj.auditorReviewedBy ? (
-                                      <span style={{ color: '#2563eb', fontWeight: 'bold' }}>
-                                        ✓ 확인 완료 ({currentProj.auditorReviewedBy} - {currentProj.auditorReviewedAt ? new Date(currentProj.auditorReviewedAt).toLocaleString() : ''})
-                                        {currentProj.auditorComment && ` [의견: ${currentProj.auditorComment}]`}
-                                      </span>
-                                    ) : currentProj.headConfirmedBy ? (
-                                      <span style={{ color: '#d97706' }}>법인장 확정 완료 ➔ 감사담당자 확인 대기 중</span>
-                                    ) : (
-                                      <span style={{ color: '#94a3b8' }}>법인장 최종 확정 후 진행 가능</span>
-                                    )}
-                                  </div>
+                          <div style={{ fontSize: '12px', color: '#475569', lineHeight: '1.6', marginBottom: '12px' }}>
+                            {currentProj.headConfirmedBy ? (
+                              <div>
+                                <div style={{ color: '#166534', fontWeight: 'bold' }}>
+                                  확정자: {currentProj.headConfirmedBy} ({currentProj.headConfirmedAt ? new Date(currentProj.headConfirmedAt).toLocaleString() : ''})
                                 </div>
-                                {(isAuditTeam || user.role === 'AUDITOR' || user.role === 'SYSTEM_ADMIN') && currentProj.headConfirmedBy && !currentProj.auditorReviewedBy && (
-                                  <button
-                                    onClick={() => handleAuditorConfirmProject(currentProj.projectId)}
-                                    style={{
-                                      padding: '8px 16px',
-                                      backgroundColor: '#2563eb',
-                                      color: '#fff',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      cursor: 'pointer',
-                                      fontWeight: 'bold',
-                                      fontSize: '13px'
-                                    }}
-                                  >
-                                    ✓ 감사담당자 확인
-                                  </button>
+                                {currentProj.headComment && (
+                                  <div style={{ marginTop: '4px', color: '#334155' }}>
+                                    💬 확정 의견: {currentProj.headComment}
+                                  </div>
                                 )}
                               </div>
-
-                              {/* 3단계: 감사책임자 최종 CONFIRM & FREEZE */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                                <div>
-                                  <strong style={{ fontSize: '13px', color: '#334155' }}>3단계: 감사책임자 최종 승인 & 동결 (FREEZE)</strong>
-                                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
-                                    {currentProj.projectState === 'FREEZE' ? (
-                                      <span style={{ color: '#059669', fontWeight: 'bold' }}>
-                                        🔒 프로젝트 최종 승인 및 동결(FREEZE) 완료 ({currentProj.auditLeaderApprovedBy} - {currentProj.auditLeaderApprovedAt ? new Date(currentProj.auditLeaderApprovedAt).toLocaleString() : ''})
-                                        {currentProj.auditLeaderComment && ` [의견: ${currentProj.auditLeaderComment}]`}
-                                      </span>
-                                    ) : currentProj.auditorReviewedBy ? (
-                                      <span style={{ color: '#d97706' }}>감사담당자 확인 완료 ➔ 감사책임자 최종 승인 및 동결 대기 중</span>
-                                    ) : (
-                                      <span style={{ color: '#94a3b8' }}>감사담당자 확인 후 진행 가능</span>
-                                    )}
-                                  </div>
-                                </div>
-                                {(user.role === 'AUDIT_LEADER' || user.role === 'SYSTEM_ADMIN') && currentProj.auditorReviewedBy && currentProj.projectState !== 'FREEZE' && (
-                                  <button
-                                    onClick={() => handleLeaderConfirmFreezeProject(currentProj.projectId)}
-                                    style={{
-                                      padding: '8px 16px',
-                                      backgroundColor: '#059669',
-                                      color: '#fff',
-                                      border: 'none',
-                                      borderRadius: '6px',
-                                      cursor: 'pointer',
-                                      fontWeight: 'bold',
-                                      fontSize: '13px'
-                                    }}
-                                  >
-                                    🏆 최종 승인 및 동결(FREEZE)
-                                  </button>
-                                )}
+                            ) : isAllAuditConfirmed ? (
+                              <div style={{ color: '#0284c7' }}>
+                                ✓ 모든 지적사항(CAP)의 감사 검증이 완료되었습니다. 아래 버튼을 눌러 법인장 최종 확정(CONFIRM)을 진행해 주십시오.
                               </div>
-                            </div>
+                            ) : (
+                              <div style={{ color: '#dc2626' }}>
+                                ⚠️ 프로젝트 내 전체 {totalCapsCount}건 중 <b>{totalCapsCount - auditConfirmedCapsCount}건</b>이 아직 감사 검증완료되지 않아 CONFIRM을 진행할 수 없습니다.
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        {/* 프로젝트에 포함된 CAP 목록 리포트 카드 */}
-                        <div style={styles.card}>
-                          <h4 style={{ margin: '0 0 14px 0', fontSize: '15px', color: '#1e293b' }}>
-                            📑 지적사항(CAP) 최종 조치 리포트 ({currentProjCaps.length}건)
-                          </h4>
-                          {currentProjCaps.length === 0 ? (
-                            <div style={styles.noDataBox}>등록된 지적사항(CAP)이 없습니다.</div>
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                              {currentProjCaps.map((c, idx) => {
-                                const cStatus = c.actionPlanStatus || c.approvalStatus || 'DRAFT';
-                                const cActionStatus = actionStatusCodes[c.findingId] || c.actionStatusCode || 'IN_PROGRESS';
-                                const isCapDone = cStatus === 'AUDIT_CONFIRMED';
-
-                                return (
-                                  <div
-                                    key={c.findingId}
-                                    style={{
-                                      padding: '16px',
-                                      borderRadius: '8px',
-                                      border: '1px solid #e2e8f0',
-                                      backgroundColor: '#fff',
-                                      borderLeft: isCapDone ? '4px solid #16a34a' : '4px solid #f59e0b'
-                                    }}
-                                  >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b' }}>#{idx + 1}</span>
-                                        <span style={styles.badgeCategory}>{c.category}</span>
-                                        <strong style={{ fontSize: '14px', color: '#1e293b' }}>{c.title}</strong>
-                                      </div>
-                                      <div style={{ display: 'flex', gap: '6px' }}>
-                                        {isCapDone ? (
-                                          <span style={{ ...styles.badgeStatus, backgroundColor: '#dcfce7', color: '#15803d' }}>감사 검증완료</span>
-                                        ) : (
-                                          <span style={{ ...styles.badgeStatus, backgroundColor: '#fef3c7', color: '#b45309' }}>검증 진행중 ({cStatus})</span>
-                                        )}
-                                        {cActionStatus === 'COMPLETED' && <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#16a34a' }}>조치완료</span>}
-                                        {cActionStatus === 'IN_PROGRESS' && <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#d97706' }}>조치중</span>}
-                                        {cActionStatus === 'ACTION_IMPOSSIBLE' && <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#dc2626' }}>조치불가</span>}
-                                      </div>
-                                    </div>
-
-                                    <div style={{ fontSize: '12px', color: '#475569', display: 'flex', gap: '16px', marginBottom: '8px' }}>
-                                      <span>담당자: <b>{c.assignedUserId} ({c.assignedDeptName || '부서미지정'})</b></span>
-                                      <span>예상 마감: <b>{c.expectedDeadline ? c.expectedDeadline.substring(0, 10) : (c.deadline1st ? c.deadline1st.substring(0, 10) : '-')}</b></span>
-                                      <span>조치 기한: <b>{c.actionDeadline ? c.actionDeadline.substring(0, 10) : '미설정'}</b></span>
-                                    </div>
-
-                                    <div style={{ backgroundColor: '#f8fafc', padding: '10px 12px', borderRadius: '6px', fontSize: '13px', marginBottom: '8px', border: '1px solid #f1f5f9' }}>
-                                      <strong style={{ color: '#475569', display: 'block', marginBottom: '4px' }}>지적 내용:</strong>
-                                      <div dangerouslySetInnerHTML={{ __html: c.findingText }} style={{ lineHeight: '1.5' }} />
-                                    </div>
-
-                                    <div style={{ backgroundColor: '#f0fdf4', padding: '10px 12px', borderRadius: '6px', fontSize: '13px', border: '1px solid #dcfce7' }}>
-                                      <strong style={{ color: '#166534', display: 'block', marginBottom: '4px' }}>최종 조치 계획 및 실적:</strong>
-                                      {c.actionText ? (
-                                        <div dangerouslySetInnerHTML={{ __html: c.actionText }} style={{ lineHeight: '1.5' }} />
-                                      ) : (
-                                        <span style={{ color: '#9ca3af' }}>등록된 조치내역이 없습니다.</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                        {/* 법인장 확정 버튼 (요구사항 4: 모든 발견사항 조치완료 시에만 활성화) */}
+                        <div>
+                          {(isHead || user?.role === 'SYSTEM_ADMIN') && !currentProj.headConfirmedBy && (
+                            <button
+                              onClick={() => handleHeadConfirmProject(currentProj.projectId)}
+                              disabled={!isAllAuditConfirmed}
+                              style={{
+                                width: '100%',
+                                padding: '10px 16px',
+                                backgroundColor: isAllAuditConfirmed ? '#0077C8' : '#cbd5e1',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: isAllAuditConfirmed ? 'pointer' : 'not-allowed',
+                                fontWeight: 'bold',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: isAllAuditConfirmed ? '0 2px 6px rgba(0,119,200,0.3)' : 'none'
+                              }}
+                            >
+                              <span>🏛️</span>
+                              {isAllAuditConfirmed ? '법인장 최종 확정 (CONFIRM 완료)' : '법인장 최종 확정 불가 (미완료 CAP 존재)'}
+                            </button>
                           )}
                         </div>
                       </div>
+
+                      {/* 우측: [요구사항 5] 감사팀 조회 및 동결(FREEZE) 영역 */}
+                      <div style={{ padding: '16px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <h4 style={{ margin: 0, fontSize: '14px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span>🔒</span> [2단계] 감사팀 최종 승인 및 동결 (FREEZE)
+                            </h4>
+                            {currentProj.projectState === 'FREEZE' ? (
+                              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#047857', backgroundColor: '#d1fae5', padding: '2px 8px', borderRadius: '4px' }}>
+                                🔒 동결 완료
+                              </span>
+                            ) : currentProj.headConfirmedBy ? (
+                              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '4px' }}>
+                                ⚡ 동결 가능
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '12px', color: '#94a3b8', backgroundColor: '#f1f5f9', padding: '2px 8px', borderRadius: '4px' }}>
+                                법인장 확정 대기
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={{ fontSize: '12px', color: '#475569', lineHeight: '1.6', marginBottom: '12px' }}>
+                            {currentProj.projectState === 'FREEZE' ? (
+                              <div>
+                                <div style={{ color: '#047857', fontWeight: 'bold' }}>
+                                  승인 및 동결 완료 ({currentProj.auditLeaderApprovedBy || '감사팀'} / {currentProj.auditLeaderApprovedAt ? new Date(currentProj.auditLeaderApprovedAt).toLocaleString() : ''})
+                                </div>
+                                {currentProj.auditLeaderComment && (
+                                  <div style={{ marginTop: '4px', color: '#334155' }}>
+                                    💬 감사팀 의견: {currentProj.auditLeaderComment}
+                                  </div>
+                                )}
+                              </div>
+                            ) : currentProj.headConfirmedBy ? (
+                              <div style={{ color: '#059669' }}>
+                                ✓ 법인장 최종 확정(CONFIRM)이 완료되었습니다. 감사팀에서 내용을 최종 검토한 후 프로젝트를 동결(FREEZE)할 수 있습니다.
+                              </div>
+                            ) : (
+                              <div style={{ color: '#64748b' }}>
+                                ※ 법인장의 최종 확정(CONFIRM)이 완료된 건에 한하여 감사팀이 최종 승인 및 동결(FREEZE)을 실행할 수 있습니다.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 감사팀 FREEZE 버튼 (요구사항 5: 감사팀에서 법인장 CONFIRM된 자료 조회 후 FREEZE) */}
+                        <div>
+                          {(isAuditTeam || user?.role === 'SYSTEM_ADMIN') && currentProj.projectState !== 'FREEZE' && (
+                            <button
+                              onClick={() => handleLeaderConfirmFreezeProject(currentProj.projectId)}
+                              disabled={!currentProj.headConfirmedBy}
+                              style={{
+                                width: '100%',
+                                padding: '10px 16px',
+                                backgroundColor: currentProj.headConfirmedBy ? '#059669' : '#cbd5e1',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: currentProj.headConfirmedBy ? 'pointer' : 'not-allowed',
+                                fontWeight: 'bold',
+                                fontSize: '14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: currentProj.headConfirmedBy ? '0 2px 6px rgba(5,150,105,0.3)' : 'none'
+                              }}
+                            >
+                              <span>🔒</span>
+                              {currentProj.headConfirmedBy ? '감사팀 최종 승인 및 동결 (FREEZE 실행)' : '감사팀 동결 불가 (법인장 미확정)'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. [요구사항 2] 해당 프로젝트 선택 시 각각의 발견사항(CAP)을 선택할 수 있는 서브 선택 그리드 */}
+                {currentProj && (
+                  <div style={styles.card}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h4 style={{ margin: 0, fontSize: '15px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>📑</span> 해당 프로젝트 등록 발견사항(CAP) 서브 선택 그리드 ({currentProjCaps.length}건)
+                      </h4>
+                      <span style={{ fontSize: '12px', color: '#64748b' }}>
+                        ※ 발견사항을 클릭하면 하단에서 상세 지적내용, 법인 조치내역, 증빙 파일 다운로드 및 이력을 검증할 수 있습니다.
+                      </span>
+                    </div>
+
+                    {currentProjCaps.length === 0 ? (
+                      <div style={styles.noDataBox}>해당 프로젝트에 등록된 발견사항(CAP)이 없습니다.</div>
+                    ) : (
+                      <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                          <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                            <tr>
+                              <th style={{ padding: '10px 12px', width: '50px', textAlign: 'center' }}>선택</th>
+                              <th style={{ padding: '10px 12px', width: '50px', textAlign: 'center' }}>No.</th>
+                              <th style={{ padding: '10px 12px', width: '90px' }}>분류</th>
+                              <th style={{ padding: '10px 12px' }}>지적사항(CAP) 제목</th>
+                              <th style={{ padding: '10px 12px', width: '130px' }}>조치 담당자/부서</th>
+                              <th style={{ padding: '10px 12px', width: '100px' }}>조치 기한</th>
+                              <th style={{ padding: '10px 12px', width: '100px', textAlign: 'center' }}>피감사 조치상태</th>
+                              <th style={{ padding: '10px 12px', width: '120px', textAlign: 'center' }}>감사 검증상태</th>
+                              <th style={{ padding: '10px 12px', width: '80px', textAlign: 'center' }}>증빙파일</th>
+                              <th style={{ padding: '10px 12px', width: '90px', textAlign: 'center' }}>검증 결과</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {currentProjCaps.map((c, idx) => {
+                              const isCapSelected = currentFinding?.findingId === c.findingId;
+                              const cStatus = c.actionPlanStatus || c.approvalStatus || 'DRAFT';
+                              const cActionStatus = actionStatusCodes[c.findingId] || c.actionStatusCode || 'IN_PROGRESS';
+                              const isCapDone = cStatus === 'AUDIT_CONFIRMED';
+                              const capFiles = findingAttachments[c.findingId] || [];
+
+                              return (
+                                <tr
+                                  key={c.findingId}
+                                  onClick={() => handleSelectFinding(c.findingId)}
+                                  style={{
+                                    backgroundColor: isCapSelected ? '#eff6ff' : '#fff',
+                                    borderBottom: '1px solid #e2e8f0',
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.15s ease'
+                                  }}
+                                >
+                                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                    <input
+                                      type="radio"
+                                      name="selectedFindingSubGrid"
+                                      checked={isCapSelected}
+                                      onChange={() => handleSelectFinding(c.findingId)}
+                                      style={{ cursor: 'pointer' }}
+                                    />
+                                  </td>
+                                  <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 'bold', color: '#64748b' }}>
+                                    #{idx + 1}
+                                  </td>
+                                  <td style={{ padding: '10px 12px' }}>
+                                    <span style={{ ...styles.badgeCategory, fontSize: '11px' }}>
+                                      {c.category}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '10px 12px' }}>
+                                    <strong style={{ color: isCapSelected ? '#0077C8' : '#1e293b', fontSize: '13px' }}>
+                                      {c.title}
+                                    </strong>
+                                  </td>
+                                  <td style={{ padding: '10px 12px', fontSize: '12px', color: '#475569' }}>
+                                    {c.assignedUserId} {c.assignedDeptName ? `(${c.assignedDeptName})` : ''}
+                                  </td>
+                                  <td style={{ padding: '10px 12px', fontSize: '12px', color: '#64748b' }}>
+                                    {c.actionDeadline ? c.actionDeadline.substring(0, 10) : (c.expectedDeadline ? c.expectedDeadline.substring(0, 10) : '-')}
+                                  </td>
+                                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                    {cActionStatus === 'COMPLETED' && (
+                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>개선완료</span>
+                                    )}
+                                    {cActionStatus === 'IN_PROGRESS' && (
+                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#d97706', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px' }}>개선중</span>
+                                    )}
+                                    {cActionStatus === 'ACTION_IMPOSSIBLE' && (
+                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#dc2626', backgroundColor: '#fee2e2', padding: '2px 6px', borderRadius: '4px' }}>개선불가</span>
+                                    )}
+                                    {cActionStatus === 'CONTINUOUS_MANAGEMENT' && (
+                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>지속관리</span>
+                                    )}
+                                    {cActionStatus === 'NOT_WRITTEN' && (
+                                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>미작성</span>
+                                    )}
+                                  </td>
+                                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                    {isCapDone ? (
+                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#15803d', backgroundColor: '#dcfce7', padding: '3px 8px', borderRadius: '4px' }}>
+                                        감사 검증완료
+                                      </span>
+                                    ) : (
+                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#b45309', backgroundColor: '#fef3c7', padding: '3px 8px', borderRadius: '4px' }}>
+                                        진행중 ({cStatus})
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px' }}>
+                                    {capFiles.length > 0 ? (
+                                      <span style={{ fontWeight: 'bold', color: '#0284c7' }}>📎 {capFiles.length}개</span>
+                                    ) : (
+                                      <span style={{ color: '#cbd5e1' }}>-</span>
+                                    )}
+                                  </td>
+                                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                    {isCapDone ? (
+                                      <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 'bold' }}>✓ 완료</span>
+                                    ) : (
+                                      <span style={{ fontSize: '12px', color: '#dc2626', fontWeight: 'bold' }}>⚠️ 미완료</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
+                  </div>
+                )}
+
+                {/* 3. [요구사항 3] 발견사항 클릭 시 상세 내역 조회 패널 */}
+                {currentFinding && (
+                  <div style={{ ...styles.card, border: '1px solid #93c5fd', backgroundColor: '#fff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#2563eb', backgroundColor: '#eff6ff', padding: '4px 8px', borderRadius: '6px' }}>
+                          상세 검증
+                        </span>
+                        <span style={styles.badgeCategory}>{currentFinding.category}</span>
+                        <h3 style={{ margin: 0, fontSize: '16px', color: '#0f172a' }}>
+                          {currentFinding.title}
+                        </h3>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>
+                          담당자: <b>{currentFinding.assignedUserId} ({currentFinding.assignedDeptName || '부서미지정'})</b>
+                        </span>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>
+                          조치기한: <b>{currentFinding.actionDeadline ? currentFinding.actionDeadline.substring(0, 10) : '미설정'}</b>
+                        </span>
+                        {(currentFinding.actionPlanStatus || currentFinding.approvalStatus) === 'AUDIT_CONFIRMED' ? (
+                          <span style={{ ...styles.badgeStatus, backgroundColor: '#dcfce7', color: '#15803d' }}>
+                            ✓ 감사 검증종료 (CONFIRM 완료)
+                          </span>
+                        ) : (
+                          <span style={{ ...styles.badgeStatus, backgroundColor: '#fef3c7', color: '#b45309' }}>
+                            ⚠️ 검증 진행중 ({currentFinding.actionPlanStatus || currentFinding.approvalStatus})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                      {/* 지적 내용 원문 */}
+                      <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                        <strong style={{ color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '14px' }}>
+                          <span>🔍</span> 지적 내용 (Finding Details)
+                        </strong>
+                        <div
+                          dangerouslySetInnerHTML={{ __html: currentFinding.findingText || '지적 내용이 없습니다.' }}
+                          style={{ fontSize: '13px', color: '#1e293b', lineHeight: '1.6', maxHeight: '200px', overflowY: 'auto' }}
+                        />
+                      </div>
+
+                      {/* 법인 조치계획 및 실행 결과 원문 */}
+                      <div style={{ backgroundColor: '#f0fdf4', padding: '14px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                        <strong style={{ color: '#166534', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '14px' }}>
+                          <span>📝</span> 법인 조치 계획 및 실적 (Action Plan & Result)
+                        </strong>
+                        <div
+                          dangerouslySetInnerHTML={{ __html: currentFinding.actionText || '<span style="color:#94a3b8;">등록된 조치 내역이 없습니다.</span>' }}
+                          style={{ fontSize: '13px', color: '#14532d', lineHeight: '1.6', maxHeight: '200px', overflowY: 'auto' }}
+                        />
+                        {currentFinding.deptAdditionalContent && (
+                          <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed #86efac', fontSize: '12px', color: '#166534' }}>
+                            <b>[유관부서 추가의견]:</b> {currentFinding.deptAdditionalContent}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 첨부 증빙파일 검증 및 다운로드 영역 */}
+                    <div style={{ marginBottom: '16px', backgroundColor: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <strong style={{ color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>
+                          <span>📎</span> 등록된 증빙자료 첨부파일 ({currentAttachments.length}건)
+                        </strong>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>
+                          법인장 및 감사팀이 증빙 파일을 직접 다운로드하여 조치 사실을 육안 검증합니다.
+                        </span>
+                      </div>
+
+                      {currentAttachments.length === 0 ? (
+                        <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', backgroundColor: '#fff', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>
+                          등록된 첨부 증빙 파일이 없습니다.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
+                          {currentAttachments.map(file => (
+                            <div
+                              key={file.fileId}
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: '10px 12px',
+                                backgroundColor: '#fff',
+                                borderRadius: '6px',
+                                border: '1px solid #cbd5e1',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                              }}
+                            >
+                              <div style={{ overflow: 'hidden', marginRight: '8px' }}>
+                                <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={file.fileName}>
+                                  📄 {file.fileName}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                                  {file.fileSize ? `${Math.round(file.fileSize / 1024)} KB` : ''} | {file.uploadedBy || '등록자'} | {file.createdAt ? file.createdAt.substring(0, 10) : ''}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleDownloadFile(file.fileId, file.fileName)}
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: '#0077C8',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold',
+                                  whiteSpace: 'nowrap',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                📥 다운로드
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 조치 및 검토 이력 타임라인 */}
+                    <div style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <strong style={{ color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', fontSize: '14px' }}>
+                        <span>🕒</span> 조치 및 검토 이력 타임라인 ({currentHistories.length}건)
+                      </strong>
+
+                      {historyLoading ? (
+                        <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>이력 로딩 중...</div>
+                      ) : currentHistories.length === 0 ? (
+                        <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>등록된 이력이 없습니다.</div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
+                          {currentHistories.map((h, hIdx) => {
+                            const dateStr = h.actionAt || h.createdAt;
+                            const formattedDate = dateStr ? new Date(dateStr).toLocaleString() : '-';
+                            return (
+                              <div
+                                key={h.historyId || hIdx}
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  padding: '8px 12px',
+                                  backgroundColor: '#f8fafc',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  borderLeft: '3px solid #0077C8'
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontWeight: 'bold', color: '#334155' }}>
+                                    {h.actionType === 'CONFIRM_MEMBER' ? '법인담당자 제출' :
+                                     h.actionType === 'CONFIRM_LEAD' ? '대표담당자 감사실 제출' :
+                                     h.actionType === 'AUDIT_CONFIRMED' ? '감사팀 검증종료' :
+                                     h.actionType === 'AUDIT_FEEDBACK' ? '감사팀 보완요청' :
+                                     h.actionType || '이력'}
+                                  </span>
+                                  <span style={{ color: '#64748b' }}>
+                                    작업자: <b>{h.actorId || '시스템'}</b>
+                                  </span>
+                                  {h.comments && (
+                                    <span style={{ color: '#475569', fontStyle: 'italic' }}>
+                                      "{h.comments}"
+                                    </span>
+                                  )}
+                                </div>
+                                <span style={{ color: '#94a3b8', fontSize: '11px' }}>
+                                  {formattedDate}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

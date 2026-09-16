@@ -342,23 +342,24 @@ public class ProjectService {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 프로젝트입니다. ID: " + projectId));
 
-        boolean isAuditLeader = UserRole.AUDIT_LEADER.name().equals(userInfo.getRole()) ||
+        boolean isAuditLeader = isAuditTeam(userInfo.getRole()) ||
                                 UserRole.SYSTEM_ADMIN.name().equals(userInfo.getRole());
 
         if (!isAuditLeader) {
-            throw new AccessDeniedException("감사 책임자(AUDIT_LEADER) 또는 시스템 관리자만 최종 승인을 진행할 수 있습니다.");
+            throw new AccessDeniedException("감사팀(AUDITOR, AUDIT_LEADER) 또는 시스템 관리자만 최종 승인을 진행할 수 있습니다.");
         }
 
-        // 감사 담당자 확인 선행 여부 검증 (SYSTEM_ADMIN 제외)
-        if (!UserRole.SYSTEM_ADMIN.name().equals(userInfo.getRole()) && !"AUDITOR_CONFIRMED".equals(project.getAuditApprovalStatus())) {
-            throw new IllegalStateException("감사 담당자(AUDITOR)의 확인이 먼저 완료되어야 최종 승인 및 동결(FREEZE)이 가능합니다.");
+        // 법인장 최종 확정 선행 여부 검증 (SYSTEM_ADMIN 제외)
+        boolean isConfirmedByHeadOrAuditor = "HEAD_CONFIRMED".equals(project.getAuditApprovalStatus()) || "AUDITOR_CONFIRMED".equals(project.getAuditApprovalStatus());
+        if (!UserRole.SYSTEM_ADMIN.name().equals(userInfo.getRole()) && !isConfirmedByHeadOrAuditor) {
+            throw new IllegalStateException("법인장의 최종 확정(HEAD_CONFIRMED)이 완료된 프로젝트에 한하여 감사팀 최종 승인 및 동결(FREEZE)이 가능합니다.");
         }
 
         project.setAuditApprovalStatus("LEADER_APPROVED");
         project.setProjectState("FREEZE");
         project.setAuditLeaderApprovedBy(userInfo.getName() != null && !userInfo.getName().isEmpty() ? userInfo.getName() : userInfo.getUsername());
         project.setAuditLeaderApprovedAt(LocalDateTime.now());
-        project.setAuditLeaderComment(comment != null ? comment : "감사 책임자 최종 승인 완료");
+        project.setAuditLeaderComment(comment != null ? comment : "감사팀 최종 승인 및 동결(FREEZE) 완료");
         project.setAuditRejectedReason(null);
         projectRepository.save(project);
     }
