@@ -40,6 +40,19 @@ pipeline {
                         -czf - . | ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} 'tar -xzf - -C ${DEPLOY_PATH}'
                     """
 
+                    // 2-1) 통합 매뉴얼 파일을 우분투 서버 /data/auditcap 폴더에 자동 배치
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} '
+                        mkdir -p ${DATA_PATH}
+                        if [ -f "${DEPLOY_PATH}/manuals_ppt/SAE-A_CAP_Integrated_Manual.pptx" ]; then
+                            cp -f "${DEPLOY_PATH}/manuals_ppt/SAE-A_CAP_Integrated_Manual.pptx" "${DATA_PATH}/SAE-A_CAP_Integrated_Manual.pptx"
+                            cp -f "${DEPLOY_PATH}/manuals_ppt/SAE-A_CAP_Integrated_Manual.pptx" "${DATA_PATH}/글로벌세아_CAP관리시스템_통합사용자매뉴얼.pptx"
+                            chmod 644 "${DATA_PATH}/SAE-A_CAP_Integrated_Manual.pptx" "${DATA_PATH}/글로벌세아_CAP관리시스템_통합사용자매뉴얼.pptx"
+                            echo "=== 우분투 서버 ${DATA_PATH} 폴더에 통합 매뉴얼 배치 완료 ==="
+                        fi
+                    '
+                    """
+
                     // 3) 원격 서버에서 기존 .env 참조하여 Docker 컨테이너 격리 빌드 및 백그라운드 실행
                     sh """
                     ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} '

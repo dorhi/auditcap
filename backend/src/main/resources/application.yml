@@ -42,3 +42,7 @@ app:
     local-path: ${APP_UPLOAD_PATH:e:/Vibe/Audit/cap_uploads}
     # 차단할 확장자 리스트
     blocked-extensions: exe,bat
+
+  manual:
+    # 우분투 서버의 /data/auditcap 경로를 최우선으로 지정
+    path: ${APP_MANUAL_PATH:/data/auditcap/SAE-A_CAP_Integrated_Manual.pptx}

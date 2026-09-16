@@ -11,9 +11,11 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
       - APP_UPLOAD_PATH=/app/uploads
+      - APP_MANUAL_PATH=/data/auditcap/SAE-A_CAP_Integrated_Manual.pptx
       - SPRING_JPA_SHOW_SQL=false
     volumes:
-      # 호스트 서버(/data/auditcap)에 증빙자료 파일을 영구 보존하기 위한 볼륨 마운트
+      # 호스트 서버(/data/auditcap)에 증빙자료 및 통합 매뉴얼 파일을 영구 보존하기 위한 볼륨 마운트
+      - /data/auditcap:/data/auditcap
       - /data/auditcap:/app/uploads
     networks:
       - auditcap-net

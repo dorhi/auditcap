@@ -1794,30 +1794,52 @@ const Dashboard = () => {
     }
   };
 
-  // [통합 매뉴얼 다운로드] 단일 통합 PPTX 파일 다운로드 핸들러
-  const handleDownloadIntegratedManual = () => {
+  // [통합 매뉴얼 다운로드] 단일 통합 PPTX 파일 다운로드 핸들러 (우분투 /data/auditcap 및 정적 폴백 2중 안전 처리)
+  const handleDownloadIntegratedManual = async () => {
+    setMessage('통합 사용자 매뉴얼(PPT) 다운로드를 준비하고 있습니다...');
     try {
-      // 브라우저 네이티브 다운로드 방식 (Blob 메모리 누수 및 조기 revokeObjectURL 다운로드 취소 버그 원천 방지)
+      // 1. 백엔드 API 호출 (/api/manual/download - 우분투 서버 /data/auditcap 경로 우선 탐색)
+      const res = await axios.get('/api/manual/download', {
+        responseType: 'blob',
+        validateStatus: (status) => status === 200
+      });
+
+      const blob = new Blob([res.data], {
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      });
+      const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = '/api/manual/download';
-      link.setAttribute('download', '글로벌세아_CAP관리시스템_통합사용자매뉴얼.pptx');
+      link.href = downloadUrl;
+      link.download = '글로벌세아_CAP관리시스템_통합사용자매뉴얼.pptx';
       document.body.appendChild(link);
       link.click();
+      link.remove();
+      // 브라우저가 디스크 저장을 마칠 때까지 넉넉하게 30초 후 해제
       setTimeout(() => {
+        window.URL.revokeObjectURL(downloadUrl);
+      }, 30000);
+      setMessage('글로벌 세아 CAP 관리 시스템 통합 사용자 매뉴얼(PPT) 다운로드가 완료되었습니다.');
+    } catch (apiErr) {
+      console.warn('API 다운로드 실패, 프론트 정적 매뉴얼 다운로드 fallback 시도:', apiErr);
+      try {
+        const staticRes = await fetch('/manuals/SAE-A_CAP_Integrated_Manual.pptx');
+        if (!staticRes.ok) throw new Error('Static file not available');
+        const blob = await staticRes.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = '글로벌세아_CAP관리시스템_통합사용자매뉴얼.pptx';
+        document.body.appendChild(link);
+        link.click();
         link.remove();
-      }, 1000);
-      setMessage('글로벌 세아 CAP 관리 시스템 통합 사용자 매뉴얼(PPT) 다운로드가 시작되었습니다.');
-    } catch (err) {
-      console.warn('API 다운로드 실패 시 정적 파일 fallback 다운로드 시도:', err);
-      const link = document.createElement('a');
-      link.href = '/manuals/SAE-A_CAP_Integrated_Manual.pptx';
-      link.setAttribute('download', '글로벌세아_CAP관리시스템_통합사용자매뉴얼.pptx');
-      document.body.appendChild(link);
-      link.click();
-      setTimeout(() => {
-        link.remove();
-      }, 1000);
-      setMessage('글로벌 세아 CAP 관리 시스템 통합 사용자 매뉴얼(PPT)이 다운로드되었습니다.');
+        setTimeout(() => {
+          window.URL.revokeObjectURL(downloadUrl);
+        }, 30000);
+        setMessage('글로벌 세아 CAP 관리 시스템 통합 사용자 매뉴얼(PPT) 다운로드가 완료되었습니다.');
+      } catch (staticErr) {
+        console.error('모든 매뉴얼 다운로드 경로 실패:', staticErr);
+        setError('통합 매뉴얼 파일을 다운로드할 수 없습니다. 우분투 서버의 /data/auditcap 폴더를 확인해 주세요.');
+      }
     }
   };
 
