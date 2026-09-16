@@ -930,9 +930,21 @@ const Dashboard = () => {
   };
 
   const handleRoleChange = async (username, newRole) => {
+    const targetUser = usersList.find(u => u.username === username);
+    const targetName = targetUser?.name || username;
+    const roleKor = getRoleKoreanName(newRole);
+    // 한글 받침에 따른 조사 선택 ('로' / '으로')
+    const lastChar = roleKor.charAt(roleKor.length - 1);
+    const code = lastChar.charCodeAt(0);
+    let particle = '로';
+    if (code >= 0xAC00 && code <= 0xD7A3) {
+      const jong = (code - 0xAC00) % 28;
+      particle = (jong === 0 || jong === 8) ? '로' : '으로';
+    }
+
     try {
       await axios.put(`/api/users/${username}/role`, { role: newRole });
-      setMessage(`${username} 님의 권한이 ${newRole}(으)로 변경되었습니다.`);
+      setMessage(`${targetName}님의 권한이 ${roleKor}${particle} 변경되었습니다.`);
       loadUsers();
     } catch (err) {
       setError(err.response?.data?.message || '권한 변경 실패');
@@ -940,10 +952,12 @@ const Dashboard = () => {
   };
 
   const handleToggleUserStatus = async (username, currentStatus) => {
+    const targetUser = usersList.find(u => u.username === username);
+    const targetName = targetUser?.name || username;
     try {
       const nextStatus = !currentStatus;
       await axios.put(`/api/users/${username}/status`, { enabled: nextStatus });
-      setMessage(`${username} 님의 계정이 ${nextStatus ? '사용 중' : '사용 안함'} 상태로 변경되었습니다.`);
+      setMessage(`${targetName}님의 계정이 ${nextStatus ? '사용 중' : '사용 안함'} 상태로 변경되었습니다.`);
       loadUsers();
     } catch (err) {
       setError(err.response?.data?.message || '사용자 상태 변경 실패');
