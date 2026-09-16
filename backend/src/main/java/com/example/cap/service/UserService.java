@@ -135,7 +135,7 @@ public class UserService {
                     .email(gwDto.getEmail())
                     .corpId(gwDto.getCorpName() != null ? gwDto.getCorpName() : "CORP_A") // 그룹웨어의 법인명 반영
                     .deptName(gwDto.getGroupName())
-                    .role(UserRole.DEPT_MEMBER) // 기본 권한: 유관부서 담당자
+                    .role(UserRole.MEMBER) // 기본 권한: 법인 담당자 (MEMBER)
                     .approvalStatus("APPROVED") // 그룹웨어 계정은 자동 승인
                     .isOtpRegistered(false)
                     .enabled(true)

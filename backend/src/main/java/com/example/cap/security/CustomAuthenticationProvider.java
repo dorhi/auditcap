@@ -102,7 +102,7 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
                         .email(gwEmail != null ? gwEmail : (username + "@sae-a.com"))
                         .corpId(gwCorpId != null && !gwCorpId.isEmpty() ? gwCorpId : "글로벌세아")
                         .deptName(gwDeptName != null && !gwDeptName.isEmpty() ? gwDeptName : "현업부서")
-                        .role(UserRole.DEPT_MEMBER)
+                        .role(UserRole.MEMBER) // 기본 권한: 법인 담당 (MEMBER)
                         .approvalStatus("APPROVED")
                         .isOtpRegistered(false)
                         .enabled(true)

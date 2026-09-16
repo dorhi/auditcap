@@ -1374,7 +1374,7 @@ const Dashboard = () => {
     }
   };
 
-  // 검색된 사원 선택 시 폼 필드 자동 완성 (ID, 성명, 법인, 부서 등 매핑, 비밀번호는 자동입력하지 않음)
+  // 검색된 사원 선택 시 폼 필드 자동 완성 (ID, 성명, 법인, 부서 등 매핑, 기본 권한: 법인담당(MEMBER))
   const handleSelectEmployee = (emp) => {
     setNewUsername(emp.username);
     setNewName(emp.name);
@@ -1383,16 +1383,17 @@ const Dashboard = () => {
     setCustomCorpInput('');
     setNewDeptName(emp.deptName || '현업부서');
     setNewPassword(''); // 비밀번호 자동 입력 방지
+    setNewRole('MEMBER'); // 기본 권한: 법인담당 (MEMBER) 자동 지정
     if (emp.alreadyRegistered) {
       setIdCheckStatus('EXISTS');
       setIdCheckMessage('⚠️ 이미 등록된 사번(ID)입니다.');
     } else {
       setIdCheckStatus('AVAILABLE');
-      setIdCheckMessage('✅ 사내 인사 시스템 연동 확인 완료 (등록 가능)');
+      setIdCheckMessage('✅ 사내 인사 시스템 연동 확인 완료 (기본 권한: 법인담당 설정됨)');
     }
   };
 
-  // 검색된 사원 즉시 등록 (원클릭 자동 등록)
+  // 검색된 사원 즉시 등록 (원클릭 자동 등록 - 기본 권한: 법인담당(MEMBER))
   const handleQuickRegisterEmployee = async (emp) => {
     if (emp.alreadyRegistered) {
       alert(`[${emp.name}] (사번/ID: ${emp.username}) 계정은 이미 등록되어 있습니다.`);
@@ -1406,10 +1407,10 @@ const Dashboard = () => {
         email: emp.email || `${emp.username}@sae-a.com`,
         corpId: emp.corpId || '글로벌세아',
         deptName: emp.deptName || '현업부서',
-        role: newRole || 'MEMBER',
+        role: 'MEMBER', // 기본적으로 법인담당으로 등록
       };
       await axios.post('/api/users', payload);
-      alert(`[${emp.name}] 사원(사번: ${emp.username}, 소속: ${emp.corpId} ${emp.deptName}) 계정이 성공적으로 자동 등록되었습니다.`);
+      alert(`[${emp.name}] 사원(사번: ${emp.username}, 소속: ${emp.corpId} ${emp.deptName}) 계정이 '법인담당' 권한으로 성공적으로 등록되었습니다.`);
       setCreateUserModalOpen(false);
       // 필드 초기화
       setNewUsername('');
@@ -5977,6 +5978,17 @@ const Dashboard = () => {
                                     }}>
                                       ID(사번): {emp.username}
                                     </span>
+                                    <span style={{
+                                      padding: '2px 8px',
+                                      backgroundColor: '#f0fdf4',
+                                      color: '#15803d',
+                                      border: '1px solid #bbf7d0',
+                                      borderRadius: '4px',
+                                      fontSize: '11px',
+                                      fontWeight: 'bold'
+                                    }}>
+                                      기본 권한: 법인담당
+                                    </span>
                                     {emp.alreadyRegistered && (
                                       <span style={{
                                         padding: '2px 6px',
@@ -6029,9 +6041,9 @@ const Dashboard = () => {
                                       fontWeight: 'bold',
                                       cursor: emp.alreadyRegistered ? 'not-allowed' : 'pointer'
                                     }}
-                                    title="이 사원 정보를 바탕으로 계정을 즉시 생성합니다"
+                                    title="이 사원 정보를 바탕으로 기본 '법인담당' 권한의 계정을 즉시 생성합니다"
                                   >
-                                    즉시 계정 등록
+                                    즉시 계정 등록 (법인담당)
                                   </button>
                                 </div>
                               </div>
