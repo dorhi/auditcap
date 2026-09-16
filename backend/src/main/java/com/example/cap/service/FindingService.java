@@ -207,6 +207,12 @@ public class FindingService {
             if (!projectService.isUserAccessibleProject(project, userInfo)) {
                 throw new AccessDeniedException("접근 권한이 없는 프로젝트의 지적사항입니다.");
             }
+            if ("PENDING_AUDIT".equals(finding.getApprovalStatus())) {
+                throw new IllegalStateException("감사실에 제출되어 검증이 진행 중인 지적사항은 수정할 수 없습니다.");
+            }
+            if ("AUDIT_CONFIRMED".equals(finding.getApprovalStatus())) {
+                throw new IllegalStateException("이미 감사실 검증이 최종 완료된 지적사항은 수정할 수 없습니다.");
+            }
         }
 
         String targetStatus = (actionStatusCode != null && !actionStatusCode.trim().isEmpty()) 

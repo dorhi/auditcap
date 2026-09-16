@@ -1260,6 +1260,14 @@ const Dashboard = () => {
     }
 
     const currentFinding = findings.find(f => f.findingId === findingId);
+    if (currentFinding?.approvalStatus === 'PENDING_AUDIT') {
+      setError('감사실에 제출되어 검증이 진행 중인 지적사항은 수정할 수 없습니다.');
+      return;
+    }
+    if (currentFinding?.approvalStatus === 'AUDIT_CONFIRMED') {
+      setError('감사실 검증이 최종 완료된 지적사항은 수정할 수 없습니다.');
+      return;
+    }
     const actionText = actionInputs[findingId] !== undefined ? actionInputs[findingId] : (currentFinding?.actionText || '');
     const actionDeadline = actionDeadlines[findingId] ? actionDeadlines[findingId] + 'T00:00:00' : (currentFinding?.actionDeadline || null);
     const completionDate = completionDates[findingId] ? completionDates[findingId] + 'T00:00:00' : (currentFinding?.completionDate || null);
@@ -1598,6 +1606,11 @@ const Dashboard = () => {
 
     if (projectState === 'FREEZE') {
       setError('동결(Freeze) 상태인 프로젝트에는 증빙 파일을 업로드할 수 없습니다.');
+      return;
+    }
+
+    if (approvalStatus === 'PENDING_AUDIT') {
+      setError('감사실에 제출되어 검증이 진행 중인 항목에는 증빙 파일을 추가 업로드할 수 없습니다.');
       return;
     }
 
@@ -2969,8 +2982,8 @@ const Dashboard = () => {
                                   setCompletionDates({ ...completionDates, [f.findingId]: '' });
                                 }
                               }}
-                              disabled={f.project?.projectState === 'FREEZE' || isAuditConfirmed}
-                              style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff', fontWeight: 'bold' }}
+                              disabled={f.project?.projectState === 'FREEZE' || isAuditConfirmed || isPendingAudit}
+                              style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: (isPendingAudit || isAuditConfirmed) ? '#f1f5f9' : '#fff', fontWeight: 'bold' }}
                             >
                               <option value="NOT_WRITTEN">미작성 (답변 미작성)</option>
                               <option value="IN_PROGRESS">개선중 ('개선 예상 시기' 필수)</option>
@@ -2988,13 +3001,13 @@ const Dashboard = () => {
                               type="date"
                               value={currentActionDeadline}
                               onChange={(e) => setActionDeadlines({ ...actionDeadlines, [f.findingId]: e.target.value })}
-                              disabled={f.project?.projectState === 'FREEZE' || isAuditConfirmed}
+                              disabled={f.project?.projectState === 'FREEZE' || isAuditConfirmed || isPendingAudit}
                               style={{
                                 padding: '6px 10px',
                                 borderRadius: '4px',
                                 border: (currentActionStatusCode === 'IN_PROGRESS' && !currentActionDeadline) ? '2px solid #ef4444' : '1px solid #cbd5e1',
                                 fontSize: '13px',
-                                backgroundColor: '#fff'
+                                backgroundColor: (isPendingAudit || isAuditConfirmed) ? '#f1f5f9' : '#fff'
                               }}
                             />
                           </div>
@@ -3007,14 +3020,14 @@ const Dashboard = () => {
                               type="date"
                               value={currentCompletionDate}
                               onChange={(e) => setCompletionDates({ ...completionDates, [f.findingId]: e.target.value })}
-                              disabled={f.project?.projectState === 'FREEZE' || isAuditConfirmed || currentActionStatusCode !== 'COMPLETED'}
+                              disabled={f.project?.projectState === 'FREEZE' || isAuditConfirmed || isPendingAudit || currentActionStatusCode !== 'COMPLETED'}
                               style={{
                                 padding: '6px 10px',
                                 borderRadius: '4px',
                                 border: (currentActionStatusCode === 'COMPLETED' && !currentCompletionDate) ? '2px solid #ef4444' : '1px solid #cbd5e1',
                                 fontSize: '13px',
-                                backgroundColor: currentActionStatusCode === 'COMPLETED' ? '#fff' : '#f1f5f9',
-                                cursor: currentActionStatusCode === 'COMPLETED' ? 'auto' : 'not-allowed'
+                                backgroundColor: (!isPendingAudit && !isAuditConfirmed && currentActionStatusCode === 'COMPLETED') ? '#fff' : '#f1f5f9',
+                                cursor: (!isPendingAudit && !isAuditConfirmed && currentActionStatusCode === 'COMPLETED') ? 'auto' : 'not-allowed'
                               }}
                             />
                             {currentActionStatusCode === 'COMPLETED' && !currentCompletionDate && (
@@ -3028,6 +3041,11 @@ const Dashboard = () => {
                           {isAuditConfirmed && (
                             <span style={{ fontSize: '12px', color: '#1e40af', fontWeight: 'bold', backgroundColor: '#dbeafe', padding: '3px 8px', borderRadius: '4px' }}>
                               감사 검증 완료 (고정)
+                            </span>
+                          )}
+                          {isPendingAudit && (
+                            <span style={{ fontSize: '12px', color: '#6d28d9', fontWeight: 'bold', backgroundColor: '#ede9fe', padding: '3px 8px', borderRadius: '4px' }}>
+                              감사실 제출 완료 (검증 진행 중 - 수정 불가)
                             </span>
                           )}
                         </div>
@@ -3049,14 +3067,14 @@ const Dashboard = () => {
                             <HtmlEditor
                               value={actionInputs[f.findingId] !== undefined ? actionInputs[f.findingId] : (f.actionText || '')}
                               onChange={(val) => setActionInputs({ ...actionInputs, [f.findingId]: val })}
-                              disabled={f.project?.projectState === 'FREEZE' || isAuditConfirmed}
+                              disabled={f.project?.projectState === 'FREEZE' || isAuditConfirmed || isPendingAudit}
                               placeholder="상세 조치 계획 및 실적을 서식으로 입력하세요..."
                             />
 
                             {/* 버튼 컨트롤 영역 (임시저장 및 단계별 결재 승인 액션) */}
                             <div style={styles.actionButtonRow}>
-                              {/* 1) 법인담당자 / 유관부서 / 법인대표 / 관리자: 조치내역 임시저장 */}
-                              {(!isAuditConfirmed && (user.role === 'MEMBER' || user.role === 'DEPT_MEMBER' || user.role === 'LEAD_REP' || user.role === 'SYSTEM_ADMIN')) && (
+                              {/* 1) 법인담당자 / 유관부서 / 법인대표 / 관리자: 조치내역 임시저장 (감사실 제출 후에는 비노출) */}
+                              {(!isAuditConfirmed && !isPendingAudit && (user.role === 'MEMBER' || user.role === 'DEPT_MEMBER' || user.role === 'LEAD_REP' || user.role === 'SYSTEM_ADMIN')) && (
                                 <button
                                   onClick={() => handleUpdateAction(f.findingId, f.project?.projectState, f.project?.corpId)}
                                   style={styles.saveBtn}
@@ -3272,7 +3290,7 @@ const Dashboard = () => {
                       {(() => {
                         const isProjectFrozen = f.project?.projectState === 'FREEZE';
                         const isActionImpossible = currentActionStatusCode === 'ACTION_IMPOSSIBLE';
-                        const isUploadDisabled = isProjectFrozen || isAuditConfirmed || isActionImpossible;
+                        const isUploadDisabled = isProjectFrozen || isAuditConfirmed || isPendingAudit || isActionImpossible;
                         const currentAttachments = findingAttachments[f.findingId] || [];
 
                         return (
@@ -3295,7 +3313,9 @@ const Dashboard = () => {
                                     ? '동결(Freeze) 상태 (업로드 차단)'
                                     : isAuditConfirmed
                                       ? '감사 검증완료/종료 (업로드 마감)'
-                                      : '개선불가 상태'}
+                                      : isPendingAudit
+                                        ? '감사실 제출 완료 (검증 중 업로드 차단)'
+                                        : '개선불가 상태'}
                                 </span>
                               )}
                             </div>
@@ -3322,7 +3342,9 @@ const Dashboard = () => {
                                         ? '프로젝트가 동결(Freeze) 상태이므로 파일 선택 및 추가 업로드가 차단되었습니다.'
                                         : isAuditConfirmed
                                           ? '감사팀의 최종 검증이 완료/종료되어 파일 선택 및 추가 업로드가 마감되었습니다.'
-                                          : '개선불가 항목으로 지정되어 파일 선택 및 추가 업로드가 비활성화되었습니다.'}
+                                          : isPendingAudit
+                                            ? '감사실에 제출되어 검증이 진행 중이므로 파일 선택 및 추가 업로드가 차단되었습니다.'
+                                            : '개선불가 항목으로 지정되어 파일 선택 및 추가 업로드가 비활성화되었습니다.'}
                                     </div>
                                   </div>
                                 );
