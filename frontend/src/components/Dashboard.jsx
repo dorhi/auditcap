@@ -1595,6 +1595,35 @@ const Dashboard = () => {
     }
   };
 
+  // 4번 메뉴: [감사 책임자] 조치내용 확인 및 즉시 최종 동결(FREEZE) 실행
+  const handleConfirmAuditorProjReviewAndFreeze = async () => {
+    if (!targetAuditProject) return;
+    if (!window.confirm(`[${targetAuditProject.projectName}] 프로젝트의 조치내용을 확인하고, 즉시 최종 확정 및 동결(FREEZE) 처리하시겠습니까?`)) {
+      return;
+    }
+    try {
+      const commentText = auditProjCommentInput.trim() || '감사 책임자 조치내용 확인 및 최종 확정/동결 완료';
+
+      // 1. 조치 확인 처리
+      await axios.post(`/api/projects/${targetAuditProject.projectId}/auditor-review`, {
+        comment: commentText
+      });
+
+      // 2. 최종 승인 및 동결(FREEZE) 처리
+      await axios.post(`/api/projects/${targetAuditProject.projectId}/leader-approve`, {
+        comment: commentText
+      });
+
+      setMessage(`[${targetAuditProject.projectName}] 프로젝트의 조치 확인 및 최종 동결(FREEZE) 처리가 완료되었습니다.`);
+      setAuditorReviewProjModalOpen(false);
+      setTargetAuditProject(null);
+      setAuditProjCommentInput('');
+      loadData();
+    } catch (err) {
+      alert(err.response?.data?.message || '조치 확인 및 동결 처리 실패');
+    }
+  };
+
   // 4번 메뉴: [감사 책임자] 프로젝트 최종 승인 모달 열기
   const openLeaderApproveProjModal = (project) => {
     setTargetAuditProject(project);
@@ -5230,42 +5259,75 @@ const Dashboard = () => {
                                       </>
                                     )}
 
-                                    {/* 2) 감사 책임자 전용 버튼 (담당자 내용확인 / 보완요청 / 최종승인 모두 가능) */}
+                                    {/* 2) 감사 책임자 전용 버튼 (담당자 내용확인 / 보완요청 / 최종 확정 및 Freeze) */}
                                     {user.role === 'AUDIT_LEADER' && (
                                       <>
                                         {auditStatus !== 'LEADER_APPROVED' && (
                                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                            {/* 담당자 내용 확인 버튼 (책임자도 직접 확인 가능) */}
-                                            {auditStatus !== 'AUDITOR_CONFIRMED' && (
-                                              <button
-                                                onClick={() => openAuditorReviewProjModal(p)}
-                                                style={{ ...styles.approveActionBtn, backgroundColor: '#4f46e5' }}
-                                                title="감사 책임자로서 조치내용을 직접 확인합니다."
-                                              >
-                                                담당자 내용 확인
-                                              </button>
+                                            {auditStatus === 'AUDITOR_CONFIRMED' ? (
+                                              <>
+                                                <span style={{ fontSize: '11px', color: '#6d28d9', fontWeight: 'bold', backgroundColor: '#ede9fe', padding: '3px 8px', borderRadius: '4px' }}>
+                                                  ✓ 담당자 확인완료
+                                                </span>
+                                                {/* 담당자 확인 완료 후 최종 확정 및 동결(FREEZE) 실행 버튼 */}
+                                                <button
+                                                  onClick={() => openLeaderApproveProjModal(p)}
+                                                  style={{
+                                                    ...styles.approveActionBtn,
+                                                    backgroundColor: '#059669',
+                                                    boxShadow: '0 2px 6px rgba(5, 150, 105, 0.3)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px'
+                                                  }}
+                                                  title="담당자 내용 확인이 완료되었으므로 최종 확정 및 프로젝트 동결(FREEZE)을 실행합니다."
+                                                >
+                                                  <span>🔒</span> 최종 확정 및 동결 (FREEZE)
+                                                </button>
+                                                {/* 보완요청 버튼 */}
+                                                <button
+                                                  onClick={() => openAuditRejectProjModal(p)}
+                                                  style={styles.rejectActionBtn}
+                                                  title="내용이 미흡하여 보완을 요청합니다."
+                                                >
+                                                  보완요청
+                                                </button>
+                                              </>
+                                            ) : (
+                                              <>
+                                                {/* 담당자 내용 확인 버튼 (책임자 직접 확인) */}
+                                                <button
+                                                  onClick={() => openAuditorReviewProjModal(p)}
+                                                  style={{ ...styles.approveActionBtn, backgroundColor: '#4f46e5' }}
+                                                  title="감사 책임자로서 조치내용을 직접 확인합니다. (확인 후 바로 FREEZE 가능)"
+                                                >
+                                                  담당자 내용 확인
+                                                </button>
+                                                {/* 바로 최종 확정 (Freeze) 버튼 */}
+                                                <button
+                                                  onClick={() => openLeaderApproveProjModal(p)}
+                                                  style={{ ...styles.approveActionBtn, backgroundColor: '#059669' }}
+                                                  title="감사 책임자로서 최종 승인하고 프로젝트를 동결(Freeze)합니다."
+                                                >
+                                                  <span>🔒</span> 최종 확정 (Freeze)
+                                                </button>
+                                                {/* 보완요청 버튼 */}
+                                                <button
+                                                  onClick={() => openAuditRejectProjModal(p)}
+                                                  style={styles.rejectActionBtn}
+                                                  title="내용이 미흡하여 보완을 요청합니다."
+                                                >
+                                                  보완요청
+                                                </button>
+                                              </>
                                             )}
-                                            {/* 보완요청 버튼 (책임자도 직접 보완요청 가능) */}
-                                            <button
-                                              onClick={() => openAuditRejectProjModal(p)}
-                                              style={styles.rejectActionBtn}
-                                              title="내용이 미흡하여 보완을 요청합니다."
-                                            >
-                                              보완요청
-                                            </button>
-                                            {/* 책임자 최종승인 (Freeze) 버튼 */}
-                                            <button
-                                              onClick={() => openLeaderApproveProjModal(p)}
-                                              style={styles.approveActionBtn}
-                                              title="감사 책임자로서 최종 승인하고 프로젝트를 동결(Freeze)합니다."
-                                            >
-                                              책임자 최종승인 (Freeze)
-                                            </button>
                                           </div>
                                         )}
                                         {auditStatus === 'LEADER_APPROVED' && (
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ fontSize: '12px', color: '#1d4ed8', fontWeight: 'bold' }}>최종 승인 완료</span>
+                                            <span style={{ fontSize: '12px', color: '#047857', fontWeight: 'bold', backgroundColor: '#d1fae5', padding: '3px 8px', borderRadius: '4px' }}>
+                                              🔒 최종 확정 및 동결 완료 (FREEZE)
+                                            </span>
                                             <button
                                               onClick={() => handleUnfreezeProject(p.projectId, p.corpId)}
                                               style={styles.unfreezeBtn}
@@ -7054,13 +7116,29 @@ const Dashboard = () => {
                 />
               </div>
             </div>
-            <div style={styles.modalFooter}>
+            <div style={{ ...styles.modalFooter, display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <button onClick={() => setAuditorReviewProjModalOpen(false)} style={styles.cancelBtn}>
                 취소
               </button>
               <button onClick={handleConfirmAuditorProjReview} style={{ ...styles.primaryBtn, backgroundColor: '#4f46e5' }}>
-                확인 완료
+                {user?.role === 'AUDIT_LEADER' ? '내용 확인만 완료' : '확인 완료'}
               </button>
+              {(user?.role === 'AUDIT_LEADER' || user?.role === 'SYSTEM_ADMIN') && (
+                <button
+                  onClick={handleConfirmAuditorProjReviewAndFreeze}
+                  style={{
+                    ...styles.approveActionBtn,
+                    backgroundColor: '#059669',
+                    boxShadow: '0 2px 6px rgba(5, 150, 105, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="조치내용 확인과 동시에 프로젝트를 최종 확정하고 동결(FREEZE)합니다."
+                >
+                  <span>🔒</span> 확인 및 즉시 최종 동결 (FREEZE)
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -7071,7 +7149,9 @@ const Dashboard = () => {
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, color: '#059669' }}>감사 책임자 최종 승인 및 동결(Freeze)</h3>
+              <h3 style={{ margin: 0, color: '#059669', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🔒</span> 감사 책임자 최종 확정 및 동결 (FREEZE)
+              </h3>
               <button onClick={() => setLeaderApproveProjModalOpen(false)} style={styles.modalCloseBtn}>×</button>
             </div>
             <div style={styles.modalBody}>
@@ -7085,15 +7165,15 @@ const Dashboard = () => {
                 </div>
               )}
               <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', padding: '10px 12px', borderRadius: '6px', marginBottom: '14px', fontSize: '12px', color: '#065f46' }}>
-                ※ 최종 승인 시 프로젝트가 <b>동결(Freeze)</b> 처리되며, 법인 및 담당자의 추가 수정이 차단됩니다.
+                ※ 최종 확정 시 프로젝트가 <b>동결(Freeze)</b> 처리되며, 법인 및 담당자의 추가 수정이 차단됩니다.
               </div>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '4px' }}>
-                  감사 책임자 승인 의견 (선택 사항)
+                  감사 책임자 확정 의견 (선택 사항)
                 </label>
                 <textarea
                   rows="3"
-                  placeholder="최종 승인 의견 및 종합 평가를 입력하세요..."
+                  placeholder="최종 확정 및 동결 의견을 입력하세요..."
                   value={auditProjCommentInput}
                   onChange={(e) => setAuditProjCommentInput(e.target.value)}
                   style={{ ...styles.textarea, width: '100%' }}
@@ -7104,8 +7184,8 @@ const Dashboard = () => {
               <button onClick={() => setLeaderApproveProjModalOpen(false)} style={styles.cancelBtn}>
                 취소
               </button>
-              <button onClick={handleConfirmLeaderProjApprove} style={styles.approveActionBtn}>
-                최종 승인 및 동결(Freeze) 확정
+              <button onClick={handleConfirmLeaderProjApprove} style={{ ...styles.approveActionBtn, backgroundColor: '#059669', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span>🔒</span> 최종 확정 및 동결 (FREEZE) 실행
               </button>
             </div>
           </div>
