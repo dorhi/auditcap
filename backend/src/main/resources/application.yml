@@ -3,9 +3,9 @@ server:
 
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: ${SPRING_DATASOURCE_URL:jdbc:sqlserver://db.sae-a.com:1433;databaseName=gains;encrypt=true;trustServerCertificate=true}
+    username: ${SPRING_DATASOURCE_USERNAME:gains}
+    password: ${SPRING_DATASOURCE_PASSWORD:!Dudehdeofh429#}
     driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
   
   jpa:
@@ -28,7 +28,7 @@ spring:
 app:
   jwt:
     # 256-bit secret key (Base64 encoded or plain text with enough length)
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:dGhpc2lzYXNlY3JldGtleWZvcmNhcG1vbml0b3JpbmdzeXN0ZW1qd3R0b2tlbnNlY3VyZQ==}
     # 1차 로그인 후 MFA 인증 대기를 위한 임시 토큰 만료 시간 (5분)
     temp-expiration-ms: 300000
     # MFA 최종 인증 완료 후 발급되는 토큰 만료 시간 (8시간)

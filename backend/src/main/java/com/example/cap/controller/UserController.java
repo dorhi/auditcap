@@ -30,6 +30,41 @@ public class UserController {
     }
 
     /**
+     * 화면 성명/부서 표기를 위한 기본 사용자 매핑 정보 (모든 로그인 사용자 접근 허용)
+     */
+    @GetMapping("/display-map")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<Map<String, Object>>> getUserDisplayMap() {
+        List<User> users = userService.getAllUsers();
+        List<Map<String, Object>> responseList = new java.util.ArrayList<>();
+        for (User u : users) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("userId", u.getId() != null ? u.getId().toString() : "");
+            map.put("username", u.getUsername());
+
+            String displayName = u.getName();
+            // DB의 name이 없거나 ID와 동일한 경우 그룹웨어 연동 정보에서 성명 보충
+            if (displayName == null || displayName.trim().isEmpty() || displayName.equalsIgnoreCase(u.getUsername())) {
+                try {
+                    GroupwareUserDto gwUser = groupwareService.findGroupwareUser(u.getUsername());
+                    if (gwUser != null && gwUser.getMemberName() != null && !gwUser.getMemberName().trim().isEmpty()) {
+                        displayName = gwUser.getMemberName();
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+
+            map.put("name", displayName != null ? displayName : u.getUsername());
+            map.put("deptName", u.getDeptName());
+            map.put("corpId", u.getCorpId());
+            map.put("role", u.getRole() != null ? u.getRole().name() : "");
+            map.put("enabled", u.getEnabled());
+            responseList.add(map);
+        }
+        return ResponseEntity.ok(responseList);
+    }
+
+    /**
      * 성명으로 글로벌세아 / 세아상역 사원 검색 API (동명이인 구분 지원)
      */
     @GetMapping("/search-employee")

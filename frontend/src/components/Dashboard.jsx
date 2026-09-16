@@ -536,6 +536,7 @@ const Dashboard = () => {
   const loadData = async () => {
     try {
       setError('');
+      loadUsers(); // 모든 화면에서 사용자 성명/부서 표시를 위해 항상 로드
       const projRes = await axios.get('/api/projects');
       setProjects(projRes.data);
 
@@ -615,9 +616,7 @@ const Dashboard = () => {
     setMessage('');
     loadData();
     loadCategories();
-    if (activeMenu === 5 || activeMenu === 'USER_MANAGEMENT' || activeMenu === 'PROJECT_REGISTER' || activeMenu === 3 || activeMenu === 'FINDING_MANAGEMENT' || isAuditTeam) {
-      loadUsers();
-    }
+    loadUsers();
   }, [activeMenu]);
 
   const loadCategories = async () => {
@@ -885,12 +884,24 @@ const Dashboard = () => {
   };
 
   const loadUsers = async () => {
-    if (!['SYSTEM_ADMIN', 'AUDIT_LEADER', 'AUDITOR'].includes(user?.role)) return;
     try {
-      const res = await axios.get('/api/users');
-      setUsersList(res.data || []);
-    } catch (err) {
-      // 오류는 조용히 무시 (권한 부족 등)
+      // 1. 모든 로그인 사용자가 성명 표기에 필요한 기본 매핑 정보 로드 (/api/users/display-map)
+      const mapRes = await axios.get('/api/users/display-map');
+      if (mapRes.data && Array.isArray(mapRes.data) && mapRes.data.length > 0) {
+        setUsersList(mapRes.data);
+        return;
+      }
+    } catch (mapErr) {
+      // display-map 실패 시 관리자/감사팀이면 /api/users 호출 시도
+    }
+
+    if (['SYSTEM_ADMIN', 'AUDIT_LEADER', 'AUDITOR'].includes(user?.role)) {
+      try {
+        const res = await axios.get('/api/users');
+        setUsersList(res.data || []);
+      } catch (err) {
+        // 오류는 조용히 무시 (권한 부족 등)
+      }
     }
   };
 
@@ -5985,16 +5996,41 @@ const Dashboard = () => {
             const isHead = user?.role === 'CORP_HEAD';
             const userCorp = (user?.corpId || '').trim();
 
-            // [요구사항 2] 조치담당자 및 부서명 변환 헬퍼 (코드명 대신 실제 이름/부서명 표기)
+            // 사용자 ID -> 이름 매핑 사전 (기본 계정 및 Fallback)
+            const KNOWN_NAME_MAP = {
+              'corp01': '법인담당자',
+              'corp02': '법인대표담당',
+              'corp03': '법인담당자2',
+              'aud01': '감사책임자',
+              'aud02': '감사담당자1',
+              'aud03': '감사담당자2',
+              'admin': '시스템관리자',
+            };
+
+            // [요구사항 2] 조치담당자 및 부서명 변환 헬퍼 (코드명/ID 대신 실제 성명/이름 표기)
             const getAssigneeName = (assignedUserId) => {
-              if (!assignedUserId) return '-';
+              if (!assignedUserId || String(assignedUserId).trim() === '' || String(assignedUserId).trim() === '-') return '-';
               const ids = String(assignedUserId).split(',').map(s => s.trim()).filter(Boolean);
+              if (ids.length === 0) return '-';
               const names = ids.map(id => {
+                // '이름(id)' 형식인 경우 이름 추출
+                const parenMatch = id.match(/^(.*?)\((.*?)\)$/);
+                if (parenMatch && parenMatch[1].trim()) {
+                  return parenMatch[1].trim();
+                }
+
                 const u = usersList.find(user => 
                   String(user.userId) === id || 
                   String(user.username).toLowerCase() === id.toLowerCase() ||
                   String(user.name).toLowerCase() === id.toLowerCase()
                 );
+
+                if (u?.name && u.name.trim() && u.name.toLowerCase() !== id.toLowerCase()) {
+                  return u.name.trim();
+                }
+                if (KNOWN_NAME_MAP[id.toLowerCase()]) {
+                  return KNOWN_NAME_MAP[id.toLowerCase()];
+                }
                 return u?.name || u?.username || id;
               });
               return names.join(', ');
@@ -6017,24 +6053,21 @@ const Dashboard = () => {
                   }
                 }
               }
-              return assignedDeptName || '부서미지정';
+              return assignedDeptName || '';
             };
 
             const getAssigneeWithDept = (assignedUserId, assignedDeptName) => {
               const aName = getAssigneeName(assignedUserId);
               const dName = getDeptName(assignedUserId, assignedDeptName);
-              if (aName === '-' && dName === '부서미지정') return '-';
-              if (dName === '부서미지정') return aName;
+              if ((!aName || aName === '-') && (!dName || dName === '부서미지정')) return '-';
+              if (!aName || aName === '-') return dName;
+              if (!dName || dName === '부서미지정') return aName;
               return `${aName} (${dName})`;
             };
 
             const getActorDisplayName = (actorId) => {
-              if (!actorId) return '시스템';
-              const u = usersList.find(user => 
-                String(user.userId) === String(actorId).trim() || 
-                String(user.username).toLowerCase() === String(actorId).trim().toLowerCase()
-              );
-              return u ? `${u.name || u.username} (${u.deptName || ''})`.replace(' ()', '') : actorId;
+              if (!actorId || String(actorId).trim() === '') return '시스템';
+              return getAssigneeName(actorId);
             };
 
             // [요구사항 1] 프로젝트 단위 조회 필터링 (법인장은 본인 법인만 엄격 조회)
@@ -6819,8 +6852,12 @@ const Dashboard = () => {
                                   <span style={{ fontWeight: 'bold', color: '#334155' }}>
                                     {h.actionType === 'CONFIRM_MEMBER' ? '법인담당자 제출' :
                                      h.actionType === 'CONFIRM_LEAD' ? '대표담당자 감사실 제출' :
-                                     h.actionType === 'AUDIT_CONFIRMED' ? '감사팀 검증종료' :
+                                     (h.actionType === 'AUDIT_CONFIRMED' || h.actionType === 'CONFIRM_AUDIT') ? '감사팀 검증종료' :
                                      h.actionType === 'AUDIT_FEEDBACK' ? '감사팀 보완요청' :
+                                     h.actionType === 'SAVE_DRAFT' ? '조치계획 임시저장' :
+                                     h.actionType === 'UPDATE_CAP' ? '지적사항 정보 수정' :
+                                     h.actionType === 'HEAD_CONFIRM' ? '법인장 최종 확정' :
+                                     h.actionType === 'FREEZE' ? '감사팀 동결 완료' :
                                      h.actionType || '이력'}
                                   </span>
                                   <span style={{ color: '#64748b' }}>
