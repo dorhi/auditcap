@@ -3387,7 +3387,7 @@ const Dashboard = () => {
                                     : isAuditConfirmed
                                       ? '감사 검증완료/종료 (업로드 마감)'
                                       : isPendingAudit
-                                        ? '감사실 제출 완료 (검증 중 업로드 차단)'
+                                        ? '감사실 제출 완료'
                                         : '개선불가 상태'}
                                 </span>
                               )}
