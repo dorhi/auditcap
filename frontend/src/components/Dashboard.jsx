@@ -255,12 +255,12 @@ const Dashboard = () => {
   // 기본 Fallback 메뉴 생성 (백엔드 지연 또는 실패 시)
   const getDefaultFallbackMenus = (role) => {
     const all = [
-      { id: 1, menuCode: 'PROJECT_REGISTER', menuName: '프로젝트 등록 (감사팀)', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 1, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN'] },
-      { id: 2, menuCode: 'ACTION_PLAN_INPUT', menuName: '조치계획 및 필수사항 입력', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 2, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'EXEC', 'CORP_HEAD', 'LEAD_REP', 'MEMBER', 'DEPT_MEMBER'] },
+      { id: 1, menuCode: 'PROJECT_REGISTER', menuName: '프로젝트 신규 등록', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 1, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'AUDIT_LEADER', 'AUDITOR'] },
+      { id: 2, menuCode: 'ACTION_PLAN_INPUT', menuName: '감사 조치계획 & 필수 정보 입력', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 2, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'EXEC', 'CORP_HEAD', 'LEAD_REP', 'MEMBER', 'DEPT_MEMBER'] },
       { id: 3, menuCode: 'FINDING_MANAGEMENT', menuName: '감사 지적사항 (CAP) 관리', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 3, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'AUDIT_LEADER', 'AUDITOR'] },
-      { id: 8, menuCode: 'HEAD_FINAL_APPROVAL', menuName: '법인장 최종 확정 결재', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 4, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'CORP_HEAD', 'AUDITOR', 'AUDIT_LEADER'] },
-      { id: 4, menuCode: 'REPORT_MONITORING', menuName: '전체 조치율 점검 및 보고', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 5, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'EXEC', 'CORP_HEAD', 'LEAD_REP', 'MEMBER', 'DEPT_MEMBER'] },
-      { id: 5, menuCode: 'USER_MANAGEMENT', menuName: '사용자 계정 관리', groupName: '시스템 관리', groupOrder: 2, icon: '', sortOrder: 1, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN'] },
+      { id: 8, menuCode: 'HEAD_FINAL_APPROVAL', menuName: '법인장 프로젝트 최종 검증 및 확정', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 4, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'CORP_HEAD', 'AUDITOR', 'AUDIT_LEADER'] },
+      { id: 4, menuCode: 'REPORT_MONITORING', menuName: '법인별 전체 감사 조치율 보고', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 5, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'EXEC', 'CORP_HEAD', 'LEAD_REP', 'MEMBER', 'DEPT_MEMBER'] },
+      { id: 5, menuCode: 'USER_MANAGEMENT', menuName: '사용자 계정 관리', groupName: '시스템 관리', groupOrder: 2, icon: '', sortOrder: 1, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'AUDIT_LEADER'] },
       { id: 6, menuCode: 'MENU_MANAGEMENT', menuName: '화면 / 메뉴 관리', groupName: '시스템 관리', groupOrder: 2, icon: '', sortOrder: 2, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN'] },
       { id: 7, menuCode: 'ROLE_PERMISSION_MANAGEMENT', menuName: '역할별 화면 접근 관리', groupName: '시스템 관리', groupOrder: 2, icon: '', sortOrder: 3, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN'] },
     ];
@@ -271,11 +271,29 @@ const Dashboard = () => {
   const fetchUserMenus = async () => {
     try {
       const res = await axios.get('/api/menus/my-menus');
-      if (res.data && res.data.length > 0) {
-        setUserMenus(res.data);
-      } else {
-        setUserMenus(getDefaultFallbackMenus(user?.role));
+      let menus = res.data && res.data.length > 0 ? res.data : getDefaultFallbackMenus(user?.role);
+
+      // 법인장, 감사팀, 시스템관리자 권한의 경우 '법인장 프로젝트 최종 검증 및 확정' 화면이 누락되지 않도록 확실하게 보장
+      const canAccessHeadApproval = ['SYSTEM_ADMIN', 'CORP_HEAD', 'AUDITOR', 'AUDIT_LEADER'].includes(user?.role);
+      if (canAccessHeadApproval && !menus.some(m => m.menuCode === 'HEAD_FINAL_APPROVAL')) {
+        menus = [
+          ...menus,
+          {
+            id: 8,
+            menuCode: 'HEAD_FINAL_APPROVAL',
+            menuName: '법인장 프로젝트 최종 검증 및 확정',
+            groupName: '감사 업무 관리',
+            groupOrder: 1,
+            icon: '',
+            sortOrder: 4,
+            screenType: 'INTERNAL',
+            allowedRoles: ['SYSTEM_ADMIN', 'CORP_HEAD', 'AUDITOR', 'AUDIT_LEADER']
+          }
+        ];
+        menus.sort((a, b) => (a.sortOrder || 99) - (b.sortOrder || 99));
       }
+
+      setUserMenus(menus);
     } catch (err) {
       console.warn('Failed to load my-menus, using fallback:', err);
       setUserMenus(getDefaultFallbackMenus(user?.role));
@@ -284,6 +302,9 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchUserMenus();
+    if (user?.role === 'CORP_HEAD') {
+      setActiveMenu('HEAD_FINAL_APPROVAL');
+    }
   }, [user?.role]);
 
   // userMenus를 groupName 기준으로 묶어 정렬
@@ -1923,6 +1944,7 @@ const Dashboard = () => {
               if (isMenuActive('PROJECT_REGISTER')) return '감사 프로젝트 신규 등록';
               if (isMenuActive('ACTION_PLAN_INPUT')) return '감사 조치계획 등록 및 관리';
               if (isMenuActive('FINDING_MANAGEMENT')) return '감사 지적사항 (CAP) 관리';
+              if (isMenuActive('HEAD_FINAL_APPROVAL')) return '법인장 프로젝트 최종 검증 및 확정';
               if (isMenuActive('REPORT_MONITORING')) return '법인별 감사 조치율 현황 및 프로젝트 통제 관리';
               if (isMenuActive('USER_MANAGEMENT')) return '사용자 계정 관리';
               if (isMenuActive('MENU_MANAGEMENT')) return '화면 및 메뉴 관리';
