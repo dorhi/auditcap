@@ -62,11 +62,10 @@ public class UploadService {
             throw new IllegalStateException("동결(Freeze) 상태인 프로젝트에는 증빙 파일을 업로드할 수 없습니다.");
         }
 
-        // 2. 조치 완료 상태 체크 (감사 최종 검증 완료 또는 개선완료)
+        // 2. 조치 완료 상태 체크 (감사 최종 검증 완료 시 업로드 차단)
         boolean isAuditConfirmed = "AUDIT_CONFIRMED".equalsIgnoreCase(finding.getApprovalStatus());
-        boolean isActionCompleted = "COMPLETED".equalsIgnoreCase(finding.getActionStatusCode());
-        if (isAuditConfirmed || isActionCompleted) {
-            throw new IllegalStateException("이미 조치 완료(감사 검증 완료 또는 개선완료) 상태인 항목에는 증빙 파일을 업로드할 수 없습니다.");
+        if (isAuditConfirmed) {
+            throw new IllegalStateException("이미 감사실 검증이 최종 완료(조치종료)된 항목에는 증빙 파일을 업로드할 수 없습니다.");
         }
 
         // 3. 디렉토리 확인 및 생성
@@ -191,8 +190,8 @@ public class UploadService {
             if (finding.getProject() != null && "FREEZE".equalsIgnoreCase(finding.getProject().getProjectState())) {
                 throw new IllegalStateException("동결(Freeze) 상태인 프로젝트의 첨부파일은 삭제할 수 없습니다.");
             }
-            if ("AUDIT_CONFIRMED".equalsIgnoreCase(finding.getApprovalStatus()) || "COMPLETED".equalsIgnoreCase(finding.getActionStatusCode())) {
-                throw new IllegalStateException("조치 완료 상태인 항목의 증빙 파일은 삭제할 수 없습니다.");
+            if ("AUDIT_CONFIRMED".equalsIgnoreCase(finding.getApprovalStatus())) {
+                throw new IllegalStateException("감사 검증이 최종 완료(조치종료)된 항목의 증빙 파일은 삭제할 수 없습니다.");
             }
         }
 

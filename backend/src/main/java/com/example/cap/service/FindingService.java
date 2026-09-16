@@ -312,8 +312,14 @@ public class FindingService {
             throw new AccessDeniedException("법인 대표담당자(LEAD_REP)만 CONFIRM 처리할 수 있습니다.");
         }
 
-        if (!"PENDING_LEAD".equals(finding.getApprovalStatus()) && !isAuditTeam(role)) {
-            throw new IllegalStateException("대표담당자 확인 대기(PENDING_LEAD) 상태의 건만 CONFIRM할 수 있습니다.");
+        if ("AUDIT_CONFIRMED".equals(finding.getApprovalStatus())) {
+            throw new IllegalStateException("이미 감사실 검증이 최종 완료된 지적사항입니다.");
+        }
+        if ("PENDING_AUDIT".equals(finding.getApprovalStatus()) && !isAuditTeam(role)) {
+            throw new IllegalStateException("이미 감사실 검증 대기 상태입니다.");
+        }
+        if (finding.getActionStatusCode() == null || "UNWRITTEN".equalsIgnoreCase(finding.getActionStatusCode())) {
+            throw new IllegalStateException("조치 상태가 입력되지 않은 건은 제출할 수 없습니다. 조치 상태 및 내용을 먼저 입력해 주세요.");
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -324,7 +330,7 @@ public class FindingService {
         finding.setRejectedReason(null);
 
         Finding saved = findingRepository.save(finding);
-        recordHistory(saved, "CONFIRM_LEAD", comment != null && !comment.trim().isEmpty() ? comment.trim() : "법인 대표담당자 CONFIRM (감사실 검증 요청)", userInfo);
+        recordHistory(saved, "CONFIRM_LEAD", comment != null && !comment.trim().isEmpty() ? comment.trim() : "법인 대표담당자 CONFIRM (감사팀 제출)", userInfo);
         return saved;
     }
 

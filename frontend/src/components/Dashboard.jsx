@@ -1307,7 +1307,7 @@ const Dashboard = () => {
     const currentCompletion = completionDates[findingId] || currentFinding?.completionDate;
 
     if (currentStatus === 'NOT_WRITTEN') {
-      setError("'미작성' 상태에서는 상신(CONFIRM)할 수 없습니다. 조치 상태(개선중/개선완료 등)를 선택하고 입력해 주세요.");
+      setError("'미작성' 상태에서는 제출(CONFIRM)할 수 없습니다. 조치 상태(개선중/개선완료 등)를 선택하고 입력해 주세요.");
       return;
     }
     if (currentStatus === 'IN_PROGRESS' && !currentDeadline) {
@@ -1329,16 +1329,35 @@ const Dashboard = () => {
     }
   };
 
-  // [결재선 2단계-1] 법인 대표담당자 CONFIRM (감사실 검증 요청)
+  // [결재선 2단계-1] 법인 대표담당자 CONFIRM (감사팀 검증 요청 / 제출)
   const handleConfirmLead = async (findingId) => {
     setError('');
     setMessage('');
+
+    const currentFinding = findings.find(f => f.findingId === findingId);
+    const currentStatus = actionStatusCodes[findingId] || currentFinding?.actionStatusCode || 'NOT_WRITTEN';
+    const currentDeadline = actionDeadlines[findingId] || currentFinding?.actionDeadline;
+    const currentCompletion = completionDates[findingId] || currentFinding?.completionDate;
+
+    if (currentStatus === 'NOT_WRITTEN') {
+      setError("'미작성' 상태에서는 제출(CONFIRM)할 수 없습니다. 조치 상태(개선중/개선완료 등)를 선택하고 입력해 주세요.");
+      return;
+    }
+    if (currentStatus === 'IN_PROGRESS' && !currentDeadline) {
+      setError("'개선중' 상태는 '개선 예상 시기' 날짜가 필수입니다.");
+      return;
+    }
+    if (currentStatus === 'COMPLETED' && !currentCompletion) {
+      setError("'개선완료' 상태는 '개선완료일자'가 필수입니다.");
+      return;
+    }
+
     const comment = window.prompt('대표담당자 검토 의견(선택 사항)을 입력하세요:');
     if (comment === null) return;
 
     try {
       const res = await axios.post(`/api/findings/${findingId}/lead-confirm`, { comment });
-      setMessage(res.data.message || '법인 대표담당자 확인이 완료되어 감사실로 검증 요청되었습니다.');
+      setMessage(res.data.message || '법인 대표담당자 확인이 완료되어 감사팀으로 제출되었습니다.');
       loadData();
       fetchFindingHistories(findingId);
     } catch (err) {
@@ -1584,11 +1603,6 @@ const Dashboard = () => {
 
     if (approvalStatus === 'AUDIT_CONFIRMED') {
       setError('감사실 검증이 최종 완료(조치종료)된 항목에는 증빙 파일을 업로드할 수 없습니다.');
-      return;
-    }
-
-    if (actionStatusCode === 'COMPLETED') {
-      setError('조치 상태가 [개선완료]인 항목에는 증빙 파일을 추가 업로드할 수 없습니다.');
       return;
     }
 
@@ -2881,7 +2895,7 @@ const Dashboard = () => {
                         <div style={styles.rejectNoticeBox}>
                           <strong>※ {isRejectedLead ? '대표담당자 재수정 요청 사유' : (isRejectedAudit ? '감사실 재작성(보완) 요청 사유' : '반려 사유')}:</strong> {f.rejectedReason || '보완 요청 사항을 확인 후 조치내역을 수정하세요.'}
                           <div style={{ fontSize: '11px', marginTop: '3px', color: '#991b1b' }}>
-                            발견사항에 대한 개선 조치를 보완/수정한 후 다시 [조치내역 임시저장] ➔ [CONFIRM (상신)]을 진행하세요.
+                            발견사항에 대한 개선 조치를 보완/수정한 후 다시 [조치내역 임시저장] ➔ [CONFIRM (제출)]을 진행하세요.
                           </div>
                         </div>
                       )}
@@ -3041,41 +3055,55 @@ const Dashboard = () => {
 
                             {/* 버튼 컨트롤 영역 (임시저장 및 단계별 결재 승인 액션) */}
                             <div style={styles.actionButtonRow}>
-                              {/* 1) 법인담당자 / 유관부서 / 관리자: 임시저장 및 상신 */}
-                              {(!isAuditConfirmed && (user.role === 'MEMBER' || user.role === 'DEPT_MEMBER' || user.role === 'SYSTEM_ADMIN')) && (
-                                <>
-                                  <button
-                                    onClick={() => handleUpdateAction(f.findingId, f.project?.projectState, f.project?.corpId)}
-                                    style={styles.saveBtn}
-                                  >
-                                    조치내역 임시저장
-                                  </button>
-                                  {(isDraft || isRejected) && (
-                                    <button
-                                      onClick={() => handleConfirmMember(f.findingId)}
-                                      style={styles.approvalReqBtn}
-                                    >
-                                      CONFIRM (법인대표 상신)
-                                    </button>
-                                  )}
-                                </>
+                              {/* 1) 법인담당자 / 유관부서 / 법인대표 / 관리자: 조치내역 임시저장 */}
+                              {(!isAuditConfirmed && (user.role === 'MEMBER' || user.role === 'DEPT_MEMBER' || user.role === 'LEAD_REP' || user.role === 'SYSTEM_ADMIN')) && (
+                                <button
+                                  onClick={() => handleUpdateAction(f.findingId, f.project?.projectState, f.project?.corpId)}
+                                  style={styles.saveBtn}
+                                >
+                                  조치내역 임시저장
+                                </button>
                               )}
 
-                              {/* 2) 법인 대표담당자: 확인 CONFIRM 또는 재수정 요청 */}
-                              {(user.role === 'LEAD_REP' || user.role === 'SYSTEM_ADMIN') && isPendingLead && (
+                              {/* 2) 일반 담당자 / 유관부서: 법인대표 제출 (작성중 또는 반려/보완요청 상태) */}
+                              {(!isAuditConfirmed && (user.role === 'MEMBER' || user.role === 'DEPT_MEMBER' || user.role === 'SYSTEM_ADMIN')) && (isDraft || isRejected) && (
+                                <button
+                                  onClick={() => handleConfirmMember(f.findingId)}
+                                  style={styles.approvalReqBtn}
+                                >
+                                  CONFIRM (법인대표 제출)
+                                </button>
+                              )}
+
+                              {/* 3) 법인 대표담당자: 
+                                     - PENDING_LEAD 상태: 감사팀 제출 또는 담당자 재수정 요청(반려)
+                                     - 보완요청/작성중 상태 (isDraft || isRejected): 대표담당자가 직접 수정 후 바로 감사팀 제출 가능 */}
+                              {(user.role === 'LEAD_REP' || user.role === 'SYSTEM_ADMIN') && !isAuditConfirmed && (
                                 <div style={{ display: 'flex', gap: '8px' }}>
-                                  <button
-                                    onClick={() => handleConfirmLead(f.findingId)}
-                                    style={{ ...styles.approveActionBtn, backgroundColor: '#0284c7' }}
-                                  >
-                                    CONFIRM (감사실 상신)
-                                  </button>
-                                  <button
-                                    onClick={() => openRejectModal(f, 'LEAD')}
-                                    style={styles.rejectActionBtn}
-                                  >
-                                    재수정 요청 (반려)
-                                  </button>
+                                  {isPendingLead && (
+                                    <>
+                                      <button
+                                        onClick={() => handleConfirmLead(f.findingId)}
+                                        style={{ ...styles.approveActionBtn, backgroundColor: '#0284c7' }}
+                                      >
+                                        CONFIRM (감사팀 제출)
+                                      </button>
+                                      <button
+                                        onClick={() => openRejectModal(f, 'LEAD')}
+                                        style={styles.rejectActionBtn}
+                                      >
+                                        재수정 요청 (반려)
+                                      </button>
+                                    </>
+                                  )}
+                                  {(!isPendingLead && !isPendingAudit && (isDraft || isRejected)) && (
+                                    <button
+                                      onClick={() => handleConfirmLead(f.findingId)}
+                                      style={{ ...styles.approveActionBtn, backgroundColor: '#0284c7' }}
+                                    >
+                                      CONFIRM (감사팀 제출)
+                                    </button>
+                                  )}
                                 </div>
                               )}
 
@@ -3171,8 +3199,8 @@ const Dashboard = () => {
                               const getHistoryBadge = (actionType) => {
                                 switch (actionType) {
                                   case 'UPDATE_ACTION': return { text: '조치 수정/임시저장', bg: '#f1f5f9', color: '#475569' };
-                                  case 'CONFIRM_MEMBER': return { text: '담당자 CONFIRM (상신)', bg: '#fef3c7', color: '#b45309' };
-                                  case 'CONFIRM_LEAD': return { text: '대표담당자 CONFIRM', bg: '#ede9fe', color: '#6d28d9' };
+                                  case 'CONFIRM_MEMBER': return { text: '담당자 CONFIRM (제출)', bg: '#fef3c7', color: '#b45309' };
+                                  case 'CONFIRM_LEAD': return { text: '대표담당자 CONFIRM (제출)', bg: '#ede9fe', color: '#6d28d9' };
                                   case 'REJECT_LEAD': return { text: '대표담당자 재수정요청', bg: '#fee2e2', color: '#b91c1c' };
                                   case 'CONFIRM_AUDIT': return { text: '감사담당자 조치종료 CONFIRM', bg: '#dbeafe', color: '#1d4ed8' };
                                   case 'REJECT_AUDIT': return { text: '감사실 재작성(보완)요청', bg: '#ffedd5', color: '#c2410c' };
@@ -3240,31 +3268,11 @@ const Dashboard = () => {
                         )}
                       </div>
 
-                      {/* 결재 및 검토 완료 기록 정보 */}
-                      {(f.leadApprovedBy || f.auditReviewedBy) && (
-                        <div style={{ ...styles.approvalHistoryBox, marginTop: '16px' }}>
-                          <strong>최종 승인 및 검증 완료 기록:</strong>
-                          <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
-                            {f.leadApprovedBy && (
-                              <div style={{ color: '#4338ca' }}>
-                                • [대표담당자 확인] <b>{f.leadApprovedBy}</b> ({f.leadApprovedAt ? new Date(f.leadApprovedAt).toLocaleString() : ''}) {f.leadComment ? ` - "${f.leadComment}"` : ''}
-                              </div>
-                            )}
-                            {f.auditReviewedBy && (
-                              <div style={{ color: '#1d4ed8' }}>
-                                • [감사담당자 검증완료] <b>{f.auditReviewedBy}</b> ({f.auditReviewedAt ? new Date(f.auditReviewedAt).toLocaleString() : ''}) {f.auditReviewComment ? ` - "${f.auditReviewComment}"` : ''}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
                       {/* 증빙 업로드 및 등록된 첨부파일 관리 */}
                       {(() => {
                         const isProjectFrozen = f.project?.projectState === 'FREEZE';
-                        const isActionCompleted = currentActionStatusCode === 'COMPLETED';
                         const isActionImpossible = currentActionStatusCode === 'ACTION_IMPOSSIBLE';
-                        const isUploadDisabled = isProjectFrozen || isAuditConfirmed || isActionCompleted || isActionImpossible;
+                        const isUploadDisabled = isProjectFrozen || isAuditConfirmed || isActionImpossible;
                         const currentAttachments = findingAttachments[f.findingId] || [];
 
                         return (
@@ -3287,9 +3295,7 @@ const Dashboard = () => {
                                     ? '동결(Freeze) 상태 (업로드 차단)'
                                     : isAuditConfirmed
                                       ? '감사 검증완료/종료 (업로드 마감)'
-                                      : isActionImpossible
-                                        ? '개선불가 상태'
-                                        : '개선완료 상태 (업로드 비활성화)'}
+                                      : '개선불가 상태'}
                                 </span>
                               )}
                             </div>
@@ -3316,9 +3322,7 @@ const Dashboard = () => {
                                         ? '프로젝트가 동결(Freeze) 상태이므로 파일 선택 및 추가 업로드가 차단되었습니다.'
                                         : isAuditConfirmed
                                           ? '감사팀의 최종 검증이 완료/종료되어 파일 선택 및 추가 업로드가 마감되었습니다.'
-                                          : isActionImpossible
-                                            ? '개선불가 항목으로 지정되어 파일 선택 및 추가 업로드가 비활성화되었습니다.'
-                                            : '개선완료 상태로 등록되어 파일 선택 및 추가 업로드가 비활성화되었습니다.'}
+                                          : '개선불가 항목으로 지정되어 파일 선택 및 추가 업로드가 비활성화되었습니다.'}
                                     </div>
                                   </div>
                                 );
