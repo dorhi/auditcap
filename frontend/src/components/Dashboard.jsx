@@ -214,6 +214,18 @@ const Dashboard = () => {
 
   const getRoleKoreanName = (roleCode) => ROLE_NAMES[roleCode] || roleCode;
 
+  // 한글 받침에 따른 조사 선택 ('로' / '으로')
+  const getParticleRo = (word) => {
+    if (!word) return '로';
+    const lastChar = word.charAt(word.length - 1);
+    const code = lastChar.charCodeAt(0);
+    if (code >= 0xAC00 && code <= 0xD7A3) {
+      const jong = (code - 0xAC00) % 28;
+      return (jong === 0 || jong === 8) ? '로' : '으로';
+    }
+    return '로';
+  };
+
   // 메뉴 아이콘 헬퍼 함수 (모든 메뉴 아이콘 제거)
   const getMenuIcon = (menu) => {
     return '';
@@ -329,6 +341,8 @@ const Dashboard = () => {
   const [projects, setProjects] = useState([]);
   const [findings, setFindings] = useState([]);
   const [usersList, setUsersList] = useState([]); // 권한 관리용
+  const [pendingUserEdits, setPendingUserEdits] = useState({}); // { [username]: { role, enabled } }
+  const [userSaving, setUserSaving] = useState(false);
   const [filterCorp, setFilterCorp] = useState('');
   const [filterDept, setFilterDept] = useState('');
   const [filterName, setFilterName] = useState('');
@@ -929,39 +943,163 @@ const Dashboard = () => {
     setSelectedDeptUsers(prev => prev.filter(id => id !== userId));
   };
 
-  const handleRoleChange = async (username, newRole) => {
+  // 5번 메뉴: 권한 선택 변경 (저장 대기 상태로 등록)
+  const handleRoleSelectChange = (username, newRole) => {
+    const origUser = usersList.find(u => u.username === username);
+    setPendingUserEdits(prev => {
+      const existing = prev[username] || {};
+      const origRole = origUser?.role;
+      const origEnabled = origUser?.enabled !== false;
+      const targetEnabled = existing.enabled !== undefined ? existing.enabled : origEnabled;
+
+      // 원래 값과 동일하게 되돌려진 경우 해당 사용자 대기 상태 제거
+      if (newRole === origRole && targetEnabled === origEnabled) {
+        const next = { ...prev };
+        delete next[username];
+        return next;
+      }
+
+      return {
+        ...prev,
+        [username]: {
+          ...existing,
+          role: newRole,
+        }
+      };
+    });
+  };
+
+  // 5번 메뉴: 사용 여부 토글 (저장 대기 상태로 등록)
+  const handleStatusTogglePending = (username, currentEnabled) => {
+    const origUser = usersList.find(u => u.username === username);
+    setPendingUserEdits(prev => {
+      const existing = prev[username] || {};
+      const nextStatus = !currentEnabled;
+      const origRole = origUser?.role;
+      const origEnabled = origUser?.enabled !== false;
+      const targetRole = existing.role !== undefined ? existing.role : origRole;
+
+      // 원래 값과 동일하게 되돌려진 경우 해당 사용자 대기 상태 제거
+      if (targetRole === origRole && nextStatus === origEnabled) {
+        const next = { ...prev };
+        delete next[username];
+        return next;
+      }
+
+      return {
+        ...prev,
+        [username]: {
+          ...existing,
+          enabled: nextStatus,
+        }
+      };
+    });
+  };
+
+  // 5번 메뉴: 개별 사용자 변경사항 저장 핸들러
+  const handleSaveSingleUser = async (username) => {
+    const edit = pendingUserEdits[username];
+    if (!edit) return;
+
     const targetUser = usersList.find(u => u.username === username);
     const targetName = targetUser?.name || username;
-    const roleKor = getRoleKoreanName(newRole);
-    // 한글 받침에 따른 조사 선택 ('로' / '으로')
-    const lastChar = roleKor.charAt(roleKor.length - 1);
-    const code = lastChar.charCodeAt(0);
-    let particle = '로';
-    if (code >= 0xAC00 && code <= 0xD7A3) {
-      const jong = (code - 0xAC00) % 28;
-      particle = (jong === 0 || jong === 8) ? '로' : '으로';
-    }
+    setUserSaving(true);
+    setError('');
+    setMessage('');
 
     try {
-      await axios.put(`/api/users/${username}/role`, { role: newRole });
-      setMessage(`${targetName}님의 권한이 ${roleKor}${particle} 변경되었습니다.`);
+      if (edit.role !== undefined && edit.role !== targetUser?.role) {
+        await axios.put(`/api/users/${username}/role`, { role: edit.role });
+      }
+      if (edit.enabled !== undefined && edit.enabled !== (targetUser?.enabled !== false)) {
+        await axios.put(`/api/users/${username}/status`, { enabled: edit.enabled });
+      }
+
+      let msg = '';
+      if (edit.role !== undefined && edit.role !== targetUser?.role) {
+        const roleKor = getRoleKoreanName(edit.role);
+        msg = `${targetName}님의 권한이 ${roleKor}${getParticleRo(roleKor)} 변경되었습니다.`;
+      } else if (edit.enabled !== undefined) {
+        msg = `${targetName}님의 계정이 ${edit.enabled ? '사용 중' : '사용 안함'} 상태로 변경되었습니다.`;
+      } else {
+        msg = `${targetName}님의 정보가 성공적으로 저장되었습니다.`;
+      }
+
+      setMessage(msg);
+      setPendingUserEdits(prev => {
+        const next = { ...prev };
+        delete next[username];
+        return next;
+      });
       loadUsers();
     } catch (err) {
-      setError(err.response?.data?.message || '권한 변경 실패');
+      setError(err.response?.data?.message || '사용자 정보 저장 실패');
+    } finally {
+      setUserSaving(false);
     }
   };
 
-  const handleToggleUserStatus = async (username, currentStatus) => {
-    const targetUser = usersList.find(u => u.username === username);
-    const targetName = targetUser?.name || username;
+  // 5번 메뉴: 변경사항 일괄 저장 핸들러
+  const handleSaveAllUserEdits = async () => {
+    const usernames = Object.keys(pendingUserEdits);
+    if (usernames.length === 0) return;
+
+    setUserSaving(true);
+    setError('');
+    setMessage('');
+
     try {
-      const nextStatus = !currentStatus;
-      await axios.put(`/api/users/${username}/status`, { enabled: nextStatus });
-      setMessage(`${targetName}님의 계정이 ${nextStatus ? '사용 중' : '사용 안함'} 상태로 변경되었습니다.`);
+      for (const username of usernames) {
+        const edit = pendingUserEdits[username];
+        const targetUser = usersList.find(u => u.username === username);
+        if (edit.role !== undefined && edit.role !== targetUser?.role) {
+          await axios.put(`/api/users/${username}/role`, { role: edit.role });
+        }
+        if (edit.enabled !== undefined && edit.enabled !== (targetUser?.enabled !== false)) {
+          await axios.put(`/api/users/${username}/status`, { enabled: edit.enabled });
+        }
+      }
+
+      if (usernames.length === 1) {
+        const username = usernames[0];
+        const edit = pendingUserEdits[username];
+        const targetUser = usersList.find(u => u.username === username);
+        const targetName = targetUser?.name || username;
+        if (edit.role !== undefined && edit.role !== targetUser?.role) {
+          const roleKor = getRoleKoreanName(edit.role);
+          setMessage(`${targetName}님의 권한이 ${roleKor}${getParticleRo(roleKor)} 변경되었습니다.`);
+        } else if (edit.enabled !== undefined) {
+          setMessage(`${targetName}님의 계정이 ${edit.enabled ? '사용 중' : '사용 안함'} 상태로 변경되었습니다.`);
+        } else {
+          setMessage(`${targetName}님의 정보가 성공적으로 저장되었습니다.`);
+        }
+      } else {
+        const firstUser = usersList.find(u => u.username === usernames[0]);
+        const firstName = firstUser?.name || usernames[0];
+        setMessage(`${firstName}님 외 ${usernames.length - 1}명의 사용자 변경사항이 성공적으로 저장되었습니다.`);
+      }
+
+      setPendingUserEdits({});
       loadUsers();
     } catch (err) {
-      setError(err.response?.data?.message || '사용자 상태 변경 실패');
+      setError(err.response?.data?.message || '사용자 변경사항 일괄 저장 실패');
+    } finally {
+      setUserSaving(false);
     }
+  };
+
+  // 5번 메뉴: 개별 사용자 변경 취소
+  const handleCancelSingleUserEdit = (username) => {
+    setPendingUserEdits(prev => {
+      const next = { ...prev };
+      delete next[username];
+      return next;
+    });
+  };
+
+  // 5번 메뉴: 모든 변경사항 취소
+  const handleCancelAllUserEdits = () => {
+    setPendingUserEdits({});
   };
 
   // 5번 메뉴: ID 중복확인 핸들러
@@ -5476,25 +5614,69 @@ const Dashboard = () => {
                     <h3 style={{ margin: 0, fontSize: '18px', color: '#1f2937' }}>임직원 계정 및 권한 관리</h3>
                     <p style={{ ...styles.cardSubtitle, margin: '4px 0 0 0' }}>모든 사용자의 부서 및 현재 권한을 조회하고, 실시간으로 시스템 접근 권한을 변경합니다.</p>
                   </div>
-                  <button
-                    onClick={handleOpenCreateUserModal}
-                    style={{
-                      padding: '9px 16px',
-                      backgroundColor: '#2563eb',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
-                    }}
-                  >
-                    신규 사용자 등록
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {Object.keys(pendingUserEdits).length > 0 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleCancelAllUserEdits}
+                          disabled={userSaving}
+                          style={{
+                            padding: '9px 14px',
+                            backgroundColor: '#f1f5f9',
+                            color: '#475569',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          ↩️ 변경 취소
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveAllUserEdits}
+                          disabled={userSaving}
+                          style={{
+                            padding: '9px 18px',
+                            backgroundColor: '#16a34a',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)',
+                          }}
+                        >
+                          💾 변경사항 일괄 저장 ({Object.keys(pendingUserEdits).length}건)
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={handleOpenCreateUserModal}
+                      style={{
+                        padding: '9px 16px',
+                        backgroundColor: '#2563eb',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
+                      }}
+                    >
+                      신규 사용자 등록
+                    </button>
+                  </div>
                 </div>
 
                 {/* 신규 사용자 등록 모달 */}
@@ -6070,6 +6252,7 @@ const Dashboard = () => {
                       <th style={styles.th}>현재 권한</th>
                       <th style={styles.th}>권한 변경</th>
                       <th style={styles.th}>사용 여부</th>
+                      <th style={{ ...styles.th, textAlign: 'center', width: '130px' }}>저장 / 관리</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -6081,38 +6264,130 @@ const Dashboard = () => {
                         if (filterRole && u.role !== filterRole) return false;
                         return true;
                       })
-                      .map(u => (
-                        <tr key={u.id || u.username} style={u.enabled === false ? { opacity: 0.6, backgroundColor: '#f8fafc' } : {}}>
-                          <td style={styles.td}>{u.corpId}</td>
-                          <td style={styles.td}>{u.deptName}</td>
-                          <td style={styles.td}><strong>{u.username}</strong></td>
-                          <td style={styles.td}>{u.name}</td>
-                          <td style={styles.td}>
-                            <span style={styles.badgeCategory}>{getRoleKoreanName(u.role)}</span>
-                            {u.enabled === false && <span style={{ marginLeft: '5px', color: '#ef4444', fontSize: '11px', fontWeight: 'bold' }}>[사용 안함]</span>}
-                          </td>
-                          <td style={styles.td}>
-                            <select
-                              value={u.role}
-                              onChange={(e) => handleRoleChange(u.username, e.target.value)}
-                              style={{ ...styles.select, width: '150px', padding: '5px 8px', margin: '0' }}
-                              disabled={u.enabled === false}
-                            >
-                              {ROLE_OPTIONS.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td style={styles.td}>
-                            <button
-                              onClick={() => handleToggleUserStatus(u.username, u.enabled !== false)}
-                              style={u.enabled !== false ? styles.deactivateBtn : styles.activateBtn}
-                            >
-                              {u.enabled !== false ? '사용 안함' : '사용 함'}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      .map(u => {
+                        const edit = pendingUserEdits[u.username];
+                        const currentRole = edit?.role !== undefined ? edit.role : u.role;
+                        const currentEnabled = edit?.enabled !== undefined ? edit.enabled : (u.enabled !== false);
+                        const isRoleModified = edit?.role !== undefined && edit.role !== u.role;
+                        const isStatusModified = edit?.enabled !== undefined && edit.enabled !== (u.enabled !== false);
+                        const isModified = isRoleModified || isStatusModified;
+
+                        return (
+                          <tr
+                            key={u.id || u.username}
+                            style={{
+                              ...(currentEnabled === false ? { opacity: 0.65, backgroundColor: '#f8fafc' } : {}),
+                              ...(isModified ? { backgroundColor: '#f0fdf4', borderLeft: '3px solid #16a34a' } : {})
+                            }}
+                          >
+                            <td style={styles.td}>{u.corpId}</td>
+                            <td style={styles.td}>{u.deptName}</td>
+                            <td style={styles.td}>
+                              <strong>{u.username}</strong>
+                              {isModified && (
+                                <span style={{
+                                  marginLeft: '6px',
+                                  padding: '2px 6px',
+                                  backgroundColor: '#dcfce7',
+                                  color: '#15803d',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: 'bold',
+                                  border: '1px solid #86efac'
+                                }}>
+                                  수정됨
+                                </span>
+                              )}
+                            </td>
+                            <td style={styles.td}>{u.name}</td>
+                            <td style={styles.td}>
+                              <span style={styles.badgeCategory}>{getRoleKoreanName(u.role)}</span>
+                              {u.enabled === false && (
+                                <span style={{ marginLeft: '5px', color: '#ef4444', fontSize: '11px', fontWeight: 'bold' }}>
+                                  [사용 안함]
+                                </span>
+                              )}
+                            </td>
+                            <td style={styles.td}>
+                              <select
+                                value={currentRole}
+                                onChange={(e) => handleRoleSelectChange(u.username, e.target.value)}
+                                style={{
+                                  ...styles.select,
+                                  width: '150px',
+                                  padding: '5px 8px',
+                                  margin: '0',
+                                  ...(isRoleModified ? { borderColor: '#16a34a', backgroundColor: '#f0fdf4', fontWeight: 'bold' } : {})
+                                }}
+                                disabled={currentEnabled === false}
+                              >
+                                {ROLE_OPTIONS.map(opt => (
+                                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td style={styles.td}>
+                              <button
+                                type="button"
+                                onClick={() => handleStatusTogglePending(u.username, currentEnabled)}
+                                style={{
+                                  ...(currentEnabled !== false ? styles.deactivateBtn : styles.activateBtn),
+                                  ...(isStatusModified ? { outline: '2px solid #16a34a' } : {})
+                                }}
+                              >
+                                {currentEnabled !== false ? '사용 안함' : '사용 함'}
+                              </button>
+                            </td>
+                            <td style={{ ...styles.td, textAlign: 'center' }}>
+                              {isModified ? (
+                                <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveSingleUser(u.username)}
+                                    disabled={userSaving}
+                                    style={{
+                                      padding: '5px 11px',
+                                      backgroundColor: '#16a34a',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      fontSize: '12px',
+                                      fontWeight: 'bold',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      boxShadow: '0 1px 3px rgba(22, 163, 74, 0.25)'
+                                    }}
+                                    title="변경사항 저장"
+                                  >
+                                    💾 저장
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCancelSingleUserEdit(u.username)}
+                                    disabled={userSaving}
+                                    style={{
+                                      padding: '5px 8px',
+                                      backgroundColor: '#f1f5f9',
+                                      color: '#64748b',
+                                      border: '1px solid #cbd5e1',
+                                      borderRadius: '4px',
+                                      fontSize: '12px',
+                                      cursor: 'pointer'
+                                    }}
+                                    title="변경 취소"
+                                  >
+                                    취소
+                                  </button>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '12px', color: '#94a3b8' }}>-</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>

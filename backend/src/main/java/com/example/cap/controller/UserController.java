@@ -189,7 +189,7 @@ public class UserController {
     }
 
     @PutMapping("/{username}/role")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'AUDIT_LEADER')")
     public ResponseEntity<?> updateUserRole(@PathVariable String username, @RequestBody Map<String, String> body) {
         try {
             String newRoleStr = body.get("role");
@@ -211,7 +211,7 @@ public class UserController {
     }
 
     @PutMapping("/{username}/status")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'AUDIT_LEADER')")
     public ResponseEntity<?> updateUserStatus(@PathVariable String username, @RequestBody Map<String, Boolean> body) {
         try {
             Boolean enabled = body.get("enabled");
