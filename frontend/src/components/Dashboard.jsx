@@ -5101,7 +5101,8 @@ const Dashboard = () => {
 
                           // 법인장 결재 완료 여부
                           const isAllHeadApproved = totalCount > 0 && headApprovedCount === totalCount;
-                          const canFreezeOrOpen = totalCount === 0 || isAllHeadApproved;
+                          const isHeadConfirmed = Boolean(p.headConfirmedBy || p.auditApprovalStatus === 'HEAD_CONFIRMED' || p.auditApprovalStatus === 'AUDITOR_CONFIRMED' || p.auditApprovalStatus === 'LEADER_APPROVED');
+                          const canFreezeOrOpen = totalCount === 0 || isAllHeadApproved || isHeadConfirmed;
                           const auditStatus = p.auditApprovalStatus || 'PENDING_AUDIT';
 
                           return (
@@ -5119,10 +5120,17 @@ const Dashboard = () => {
                                   <span style={{ ...styles.badgeStatus, backgroundColor: '#f1f5f9', color: '#64748b' }}>
                                     등록 항목 없음 (0건)
                                   </span>
-                                ) : isAllHeadApproved ? (
-                                  <span style={{ ...styles.badgeStatus, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
-                                    법인장 결재 완료 ({headApprovedCount}/{totalCount})
-                                  </span>
+                                ) : (isAllHeadApproved || isHeadConfirmed) ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                    <span style={{ ...styles.badgeStatus, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
+                                      법인장 결재 완료 {p.headConfirmedBy ? `(${p.headConfirmedBy})` : `(${headApprovedCount}/${totalCount})`}
+                                    </span>
+                                    {p.headConfirmedAt && (
+                                      <span style={{ fontSize: '11px', color: '#166534' }}>
+                                        확정: {new Date(p.headConfirmedAt).toLocaleDateString()}
+                                      </span>
+                                    )}
+                                  </div>
                                 ) : (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                     <span style={{ ...styles.badgeStatus, backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
@@ -5169,6 +5177,11 @@ const Dashboard = () => {
                                       • 확인자: <b>{p.auditorReviewedBy}</b> ({p.auditorReviewedAt ? new Date(p.auditorReviewedAt).toLocaleDateString() : ''})
                                     </div>
                                   </div>
+                                )}
+                                {auditStatus === 'HEAD_CONFIRMED' && (
+                                  <span style={{ ...styles.badgeStatus, backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
+                                    감사팀 검토 대기 (법인장 확정완료)
+                                  </span>
                                 )}
                                 {auditStatus === 'PENDING_AUDIT' && (
                                   <span style={{ ...styles.badgeStatus, backgroundColor: '#f1f5f9', color: '#64748b' }}>
@@ -5217,16 +5230,30 @@ const Dashboard = () => {
                                       </>
                                     )}
 
-                                    {/* 2) 감사 책임자 전용 버튼 */}
+                                    {/* 2) 감사 책임자 전용 버튼 (담당자 내용확인 / 보완요청 / 최종승인 모두 가능) */}
                                     {user.role === 'AUDIT_LEADER' && (
                                       <>
-                                        {auditStatus !== 'AUDITOR_CONFIRMED' && auditStatus !== 'LEADER_APPROVED' && (
-                                          <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                                            담당자 확인 선행 필요
-                                          </span>
-                                        )}
-                                        {auditStatus === 'AUDITOR_CONFIRMED' && (
-                                          <>
+                                        {auditStatus !== 'LEADER_APPROVED' && (
+                                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                            {/* 담당자 내용 확인 버튼 (책임자도 직접 확인 가능) */}
+                                            {auditStatus !== 'AUDITOR_CONFIRMED' && (
+                                              <button
+                                                onClick={() => openAuditorReviewProjModal(p)}
+                                                style={{ ...styles.approveActionBtn, backgroundColor: '#4f46e5' }}
+                                                title="감사 책임자로서 조치내용을 직접 확인합니다."
+                                              >
+                                                담당자 내용 확인
+                                              </button>
+                                            )}
+                                            {/* 보완요청 버튼 (책임자도 직접 보완요청 가능) */}
+                                            <button
+                                              onClick={() => openAuditRejectProjModal(p)}
+                                              style={styles.rejectActionBtn}
+                                              title="내용이 미흡하여 보완을 요청합니다."
+                                            >
+                                              보완요청
+                                            </button>
+                                            {/* 책임자 최종승인 (Freeze) 버튼 */}
                                             <button
                                               onClick={() => openLeaderApproveProjModal(p)}
                                               style={styles.approveActionBtn}
@@ -5234,13 +5261,7 @@ const Dashboard = () => {
                                             >
                                               책임자 최종승인 (Freeze)
                                             </button>
-                                            <button
-                                              onClick={() => openAuditRejectProjModal(p)}
-                                              style={styles.rejectActionBtn}
-                                            >
-                                              보완요청
-                                            </button>
-                                          </>
+                                          </div>
                                         )}
                                         {auditStatus === 'LEADER_APPROVED' && (
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -7008,7 +7029,9 @@ const Dashboard = () => {
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, color: '#4f46e5' }}>감사 담당자 조치내용 확인</h3>
+              <h3 style={{ margin: 0, color: '#4f46e5' }}>
+                {user?.role === 'AUDIT_LEADER' ? '감사 책임자 조치내용 확인' : '감사 담당자 조치내용 확인'}
+              </h3>
               <button onClick={() => setAuditorReviewProjModalOpen(false)} style={styles.modalCloseBtn}>×</button>
             </div>
             <div style={styles.modalBody}>
@@ -7016,11 +7039,11 @@ const Dashboard = () => {
                 대상 프로젝트: <strong>{targetAuditProject?.projectName}</strong> ({targetAuditProject?.corpId})
               </p>
               <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 12px', borderRadius: '6px', marginBottom: '14px', fontSize: '12px', color: '#15803d' }}>
-                ※ 법인장 결재가 완료된 지적사항 및 조치계획 내용을 검토하였음을 확인합니다. 확인 후 감사 책임자 최종 승인 단계로 넘어갑니다.
+                ※ 법인장 결재가 완료된 지적사항 및 조치계획 내용을 검토하였음을 확인합니다.
               </div>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '4px' }}>
-                  감사 담당자 검토 의견 (선택 사항)
+                  {user?.role === 'AUDIT_LEADER' ? '감사 책임자 검토 의견 (선택 사항)' : '감사 담당자 검토 의견 (선택 사항)'}
                 </label>
                 <textarea
                   rows="3"
