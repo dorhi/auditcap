@@ -1795,28 +1795,28 @@ const Dashboard = () => {
   };
 
   // [통합 매뉴얼 다운로드] 단일 통합 PPTX 파일 다운로드 핸들러
-  const handleDownloadIntegratedManual = async () => {
+  const handleDownloadIntegratedManual = () => {
     try {
-      const res = await axios.get('/api/manual/download', {
-        responseType: 'blob'
-      });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      // 브라우저 네이티브 다운로드 방식 (Blob 메모리 누수 및 조기 revokeObjectURL 다운로드 취소 버그 원천 방지)
       const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'SAE-A_CAP_Integrated_Manual.pptx');
+      link.href = '/api/manual/download';
+      link.setAttribute('download', '글로벌세아_CAP관리시스템_통합사용자매뉴얼.pptx');
       document.body.appendChild(link);
       link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      setMessage('글로벌 세아 CAP 관리 시스템 통합 사용자 매뉴얼(PPT)이 다운로드되었습니다.');
+      setTimeout(() => {
+        link.remove();
+      }, 1000);
+      setMessage('글로벌 세아 CAP 관리 시스템 통합 사용자 매뉴얼(PPT) 다운로드가 시작되었습니다.');
     } catch (err) {
-      console.warn('API 다운로드 실패 시 정적 파일 fallback 다운로드 시도');
+      console.warn('API 다운로드 실패 시 정적 파일 fallback 다운로드 시도:', err);
       const link = document.createElement('a');
       link.href = '/manuals/SAE-A_CAP_Integrated_Manual.pptx';
-      link.setAttribute('download', 'SAE-A_CAP_Integrated_Manual.pptx');
+      link.setAttribute('download', '글로벌세아_CAP관리시스템_통합사용자매뉴얼.pptx');
       document.body.appendChild(link);
       link.click();
-      link.remove();
+      setTimeout(() => {
+        link.remove();
+      }, 1000);
       setMessage('글로벌 세아 CAP 관리 시스템 통합 사용자 매뉴얼(PPT)이 다운로드되었습니다.');
     }
   };
