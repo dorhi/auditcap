@@ -898,24 +898,27 @@ const Dashboard = () => {
   };
 
   const loadUsers = async () => {
-    try {
-      // 1. 모든 로그인 사용자가 성명 표기에 필요한 기본 매핑 정보 로드 (/api/users/display-map)
-      const mapRes = await axios.get('/api/users/display-map');
-      if (mapRes.data && Array.isArray(mapRes.data) && mapRes.data.length > 0) {
-        setUsersList(mapRes.data);
-        return;
-      }
-    } catch (mapErr) {
-      // display-map 실패 시 관리자/감사팀이면 /api/users 호출 시도
-    }
-
+    // 1. 관리자 및 감사팀인 경우 전체 사용자 목록(/api/users)을 우선 로드하여 role, enabled, approvalStatus 등 완전한 정보를 확보
     if (['SYSTEM_ADMIN', 'AUDIT_LEADER', 'AUDITOR'].includes(user?.role)) {
       try {
         const res = await axios.get('/api/users');
-        setUsersList(res.data || []);
+        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+          setUsersList(res.data);
+          return;
+        }
       } catch (err) {
-        // 오류는 조용히 무시 (권한 부족 등)
+        console.warn('/api/users 로드 실패, display-map 대체 시도:', err);
       }
+    }
+
+    // 2. 일반 권한 사용자이거나 /api/users 실패 시 기본 표시 매핑(/api/users/display-map) 로드
+    try {
+      const mapRes = await axios.get('/api/users/display-map');
+      if (mapRes.data && Array.isArray(mapRes.data)) {
+        setUsersList(mapRes.data);
+      }
+    } catch (mapErr) {
+      console.error('사용자 매핑 정보 로드 실패:', mapErr);
     }
   };
 
@@ -1003,23 +1006,28 @@ const Dashboard = () => {
 
     const targetUser = usersList.find(u => u.username === username);
     const targetName = targetUser?.name || username;
+    const hasRoleEdit = edit.role !== undefined;
+    const hasStatusEdit = edit.enabled !== undefined;
+
+    if (!hasRoleEdit && !hasStatusEdit) return;
+
     setUserSaving(true);
     setError('');
     setMessage('');
 
     try {
-      if (edit.role !== undefined && edit.role !== targetUser?.role) {
+      if (hasRoleEdit) {
         await axios.put(`/api/users/${username}/role`, { role: edit.role });
       }
-      if (edit.enabled !== undefined && edit.enabled !== (targetUser?.enabled !== false)) {
+      if (hasStatusEdit) {
         await axios.put(`/api/users/${username}/status`, { enabled: edit.enabled });
       }
 
       let msg = '';
-      if (edit.role !== undefined && edit.role !== targetUser?.role) {
+      if (hasRoleEdit) {
         const roleKor = getRoleKoreanName(edit.role);
         msg = `${targetName}님의 권한이 ${roleKor}${getParticleRo(roleKor)} 변경되었습니다.`;
-      } else if (edit.enabled !== undefined) {
+      } else if (hasStatusEdit) {
         msg = `${targetName}님의 계정이 ${edit.enabled ? '사용 중' : '사용 안함'} 상태로 변경되었습니다.`;
       } else {
         msg = `${targetName}님의 정보가 성공적으로 저장되었습니다.`;
@@ -1031,7 +1039,7 @@ const Dashboard = () => {
         delete next[username];
         return next;
       });
-      loadUsers();
+      await loadUsers();
     } catch (err) {
       setError(err.response?.data?.message || '사용자 정보 저장 실패');
     } finally {
@@ -1051,11 +1059,10 @@ const Dashboard = () => {
     try {
       for (const username of usernames) {
         const edit = pendingUserEdits[username];
-        const targetUser = usersList.find(u => u.username === username);
-        if (edit.role !== undefined && edit.role !== targetUser?.role) {
+        if (edit.role !== undefined) {
           await axios.put(`/api/users/${username}/role`, { role: edit.role });
         }
-        if (edit.enabled !== undefined && edit.enabled !== (targetUser?.enabled !== false)) {
+        if (edit.enabled !== undefined) {
           await axios.put(`/api/users/${username}/status`, { enabled: edit.enabled });
         }
       }
@@ -1065,7 +1072,7 @@ const Dashboard = () => {
         const edit = pendingUserEdits[username];
         const targetUser = usersList.find(u => u.username === username);
         const targetName = targetUser?.name || username;
-        if (edit.role !== undefined && edit.role !== targetUser?.role) {
+        if (edit.role !== undefined) {
           const roleKor = getRoleKoreanName(edit.role);
           setMessage(`${targetName}님의 권한이 ${roleKor}${getParticleRo(roleKor)} 변경되었습니다.`);
         } else if (edit.enabled !== undefined) {
@@ -1080,7 +1087,7 @@ const Dashboard = () => {
       }
 
       setPendingUserEdits({});
-      loadUsers();
+      await loadUsers();
     } catch (err) {
       setError(err.response?.data?.message || '사용자 변경사항 일괄 저장 실패');
     } finally {

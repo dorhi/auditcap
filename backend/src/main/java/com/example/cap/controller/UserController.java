@@ -46,6 +46,10 @@ public class UserController {
             map.put("name", u.getName() != null ? u.getName() : u.getUsername());
             map.put("deptName", u.getDeptName());
             map.put("corpId", u.getCorpId());
+            map.put("role", u.getRole() != null ? u.getRole().name() : "");
+            map.put("enabled", u.getEnabled() != null ? u.getEnabled() : true);
+            map.put("email", u.getEmail());
+            map.put("approvalStatus", u.getApprovalStatus());
             responseList.add(map);
         }
         return ResponseEntity.ok(responseList);
