@@ -258,7 +258,7 @@ const Dashboard = () => {
       { id: 1, menuCode: 'PROJECT_REGISTER', menuName: '프로젝트 신규 등록', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 1, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'AUDIT_LEADER', 'AUDITOR'] },
       { id: 2, menuCode: 'ACTION_PLAN_INPUT', menuName: '감사 조치계획 & 필수 정보 입력', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 2, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'EXEC', 'CORP_HEAD', 'LEAD_REP', 'MEMBER', 'DEPT_MEMBER'] },
       { id: 3, menuCode: 'FINDING_MANAGEMENT', menuName: '감사 지적사항 (CAP) 관리', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 3, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'AUDIT_LEADER', 'AUDITOR'] },
-      { id: 8, menuCode: 'HEAD_FINAL_APPROVAL', menuName: '법인장 프로젝트 최종 검증 및 확정', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 4, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'CORP_HEAD', 'AUDITOR', 'AUDIT_LEADER'] },
+      { id: 8, menuCode: 'HEAD_FINAL_APPROVAL', menuName: '프로젝트 최종 검증 및 확정', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 4, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'CORP_HEAD', 'AUDITOR', 'AUDIT_LEADER'] },
       { id: 4, menuCode: 'REPORT_MONITORING', menuName: '법인별 전체 감사 조치율 보고', groupName: '감사 업무 관리', groupOrder: 1, icon: '', sortOrder: 5, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'EXEC', 'CORP_HEAD', 'LEAD_REP', 'MEMBER', 'DEPT_MEMBER'] },
       { id: 5, menuCode: 'USER_MANAGEMENT', menuName: '사용자 계정 관리', groupName: '시스템 관리', groupOrder: 2, icon: '', sortOrder: 1, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'AUDIT_LEADER'] },
       { id: 6, menuCode: 'MENU_MANAGEMENT', menuName: '화면 / 메뉴 관리', groupName: '시스템 관리', groupOrder: 2, icon: '', sortOrder: 2, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN'] },
@@ -273,7 +273,7 @@ const Dashboard = () => {
       const res = await axios.get('/api/menus/my-menus');
       let menus = res.data && res.data.length > 0 ? res.data : getDefaultFallbackMenus(user?.role);
 
-      // 법인장, 감사팀, 시스템관리자 권한의 경우 '법인장 프로젝트 최종 검증 및 확정' 화면이 누락되지 않도록 확실하게 보장
+      // 법인장, 감사팀, 시스템관리자 권한의 경우 '프로젝트 최종 검증 및 확정' 화면이 누락되지 않도록 확실하게 보장
       const canAccessHeadApproval = ['SYSTEM_ADMIN', 'CORP_HEAD', 'AUDITOR', 'AUDIT_LEADER'].includes(user?.role);
       if (canAccessHeadApproval && !menus.some(m => m.menuCode === 'HEAD_FINAL_APPROVAL')) {
         menus = [
@@ -281,7 +281,7 @@ const Dashboard = () => {
           {
             id: 8,
             menuCode: 'HEAD_FINAL_APPROVAL',
-            menuName: '법인장 프로젝트 최종 검증 및 확정',
+            menuName: '프로젝트 최종 검증 및 확정',
             groupName: '감사 업무 관리',
             groupOrder: 1,
             icon: '',
@@ -5979,19 +5979,72 @@ const Dashboard = () => {
           )}
 
           {/* ================================================================= */}
-          {/* 8번 탭: 법인장 최종 확정 결재 (프로젝트 종합 검증/CONFIRM 및 감사팀 FREEZE) */}
+          {/* 8번 탭: 프로젝트 최종 검증 및 확정 (프로젝트 종합 검증/CONFIRM 및 감사팀 FREEZE) */}
           {/* ================================================================= */}
           {isMenuActive('HEAD_FINAL_APPROVAL') && (() => {
             const isHead = user?.role === 'CORP_HEAD';
-            const userCorp = user?.corpId || '';
+            const userCorp = (user?.corpId || '').trim();
 
-            // 1. 프로젝트 단위 조회 필터링
+            // [요구사항 2] 조치담당자 및 부서명 변환 헬퍼 (코드명 대신 실제 이름/부서명 표기)
+            const getAssigneeName = (assignedUserId) => {
+              if (!assignedUserId) return '-';
+              const ids = String(assignedUserId).split(',').map(s => s.trim()).filter(Boolean);
+              const names = ids.map(id => {
+                const u = usersList.find(user => 
+                  String(user.userId) === id || 
+                  String(user.username).toLowerCase() === id.toLowerCase() ||
+                  String(user.name).toLowerCase() === id.toLowerCase()
+                );
+                return u?.name || u?.username || id;
+              });
+              return names.join(', ');
+            };
+
+            const getDeptName = (assignedUserId, assignedDeptName) => {
+              if (assignedDeptName && !assignedDeptName.startsWith('DEPT_') && !assignedDeptName.startsWith('dept_')) {
+                return assignedDeptName;
+              }
+              if (assignedUserId) {
+                const ids = String(assignedUserId).split(',').map(s => s.trim()).filter(Boolean);
+                for (const id of ids) {
+                  const u = usersList.find(user => 
+                    String(user.userId) === id || 
+                    String(user.username).toLowerCase() === id.toLowerCase() ||
+                    String(user.name).toLowerCase() === id.toLowerCase()
+                  );
+                  if (u?.deptName && !u.deptName.startsWith('DEPT_')) {
+                    return u.deptName;
+                  }
+                }
+              }
+              return assignedDeptName || '부서미지정';
+            };
+
+            const getAssigneeWithDept = (assignedUserId, assignedDeptName) => {
+              const aName = getAssigneeName(assignedUserId);
+              const dName = getDeptName(assignedUserId, assignedDeptName);
+              if (aName === '-' && dName === '부서미지정') return '-';
+              if (dName === '부서미지정') return aName;
+              return `${aName} (${dName})`;
+            };
+
+            const getActorDisplayName = (actorId) => {
+              if (!actorId) return '시스템';
+              const u = usersList.find(user => 
+                String(user.userId) === String(actorId).trim() || 
+                String(user.username).toLowerCase() === String(actorId).trim().toLowerCase()
+              );
+              return u ? `${u.name || u.username} (${u.deptName || ''})`.replace(' ()', '') : actorId;
+            };
+
+            // [요구사항 1] 프로젝트 단위 조회 필터링 (법인장은 본인 법인만 엄격 조회)
             const filteredProjects = projects.filter(p => {
-              // 법인장 권한: 본인 소속 법인만 열람 가능
+              // 법인장 권한: 본인 소속 법인만 엄격하게 조회 (타 법인 원천 차단)
               if (isHead) {
-                if (p.corpId !== userCorp) return false;
+                if (!userCorp) return false;
+                if ((p.corpId || '').trim().toLowerCase() !== userCorp.toLowerCase()) return false;
               } else if (finalProjectFilterCorp) {
-                if (p.corpId !== finalProjectFilterCorp) return false;
+                if ((p.corpId || '').trim().toLowerCase() !== finalProjectFilterCorp.trim().toLowerCase()) return false;
               }
 
               // 검색어 필터 (프로젝트명, 법인명)
@@ -6025,13 +6078,13 @@ const Dashboard = () => {
               return true;
             });
 
-            // 현재 선택된 프로젝트
+            // 현재 선택된 프로젝트 (법인장인 경우 본인 법인 프로젝트 목록 내에서만 선택)
             const currentProj = filteredProjects.find(p => p.projectId === selectedFinalProjectId)
               || filteredProjects[0]
               || null;
 
-            // 선택된 프로젝트의 지적사항(CAP) 목록
-            const currentProjCaps = currentProj
+            // 선택된 프로젝트의 지적사항(CAP) 목록 (법인장인 경우 본인 법인 프로젝트에 대해서만 조회)
+            const currentProjCaps = (currentProj && (!isHead || (currentProj.corpId || '').trim().toLowerCase() === userCorp.toLowerCase()))
               ? findings.filter(f => f.project?.projectId === currentProj.projectId)
               : [];
 
@@ -6070,20 +6123,22 @@ const Dashboard = () => {
             const currentAttachments = (currentFinding && findingAttachments[currentFinding.findingId]) || [];
             const currentHistories = findingHistories || [];
 
-            // 고유 법인 목록 (필터 드롭다운용)
-            const uniqueCorps = Array.from(new Set(projects.map(p => p.corpId).filter(Boolean)));
+            // 고유 법인 목록 (감사팀/관리자용 필터 드롭다운)
+            const uniqueCorps = isHead
+              ? [userCorp]
+              : Array.from(new Set(projects.map(p => p.corpId).filter(Boolean)));
 
             return (
               <div style={styles.containerCol}>
-                {/* 상단 타이틀 & 안내 헤더 */}
+                {/* [요구사항 3] 상단 타이틀 & 안내 헤더 */}
                 <div style={styles.card}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span>🏛️</span> 법인장 감사 결과 검증 및 최종 확정 (CONFIRM) / 감사팀 동결 (FREEZE)
+                        <span>🏛️</span> 프로젝트 최종 검증 및 확정 (CONFIRM) / 감사팀 동결 (FREEZE)
                       </h3>
                       <p style={styles.cardSubtitle}>
-                        프로젝트별 발견사항(CAP)의 조치 및 감사 검증 결과를 종합 검토하고 법인장 최종 확정(CONFIRM)을 진행합니다. 모든 발견사항이 조치 완료된 경우에만 확정할 수 있으며, 감사팀은 확정 완료 건을 조회하여 최종 동결(FREEZE)합니다.
+                        감사 프로젝트별 발견사항(CAP)의 조치 및 감사 검증 결과를 종합 검토하고 최종 확정(CONFIRM)을 진행합니다. 모든 발견사항이 조치 완료된 경우에만 확정할 수 있으며, 감사팀은 확정 완료 건을 조회하여 최종 승인 및 동결(FREEZE)합니다.
                       </p>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -6093,14 +6148,14 @@ const Dashboard = () => {
                     </div>
                   </div>
 
-                  {/* 1. 프로젝트 단위 검색 및 필터 영역 */}
+                  {/* 1. [요구사항 1] 프로젝트 단위 검색 및 필터 영역 (법인장은 자기 법인 고정) */}
                   <div style={{ marginTop: '16px', padding: '14px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
-                    {/* 법인 선택 필터 */}
+                    {/* 법인 선택 필터: 법인장은 본인 법인 전용 고정 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>소속 법인:</label>
                       {isHead ? (
-                        <div style={{ padding: '6px 12px', backgroundColor: '#e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', color: '#334155' }}>
-                          🏢 {userCorp} (본인 법인 고정)
+                        <div style={{ padding: '6px 12px', backgroundColor: '#e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', color: '#1e3a8a', border: '1px solid #cbd5e1' }}>
+                          🏢 {userCorp} (본인 법인 전용)
                         </div>
                       ) : (
                         <select
@@ -6126,7 +6181,7 @@ const Dashboard = () => {
                       >
                         <option value="ALL">전체 상태</option>
                         <option value="READY">⏳ 확정 대기 (전체 CAP 검증완료 건)</option>
-                        <option value="CONFIRMED">🏛️ 법인장 확정 완료 건</option>
+                        <option value="CONFIRMED">🏛️ 확정 완료 건</option>
                         <option value="FREEZE">🔒 최종 동결 (FREEZE) 완료 건</option>
                         <option value="IN_PROGRESS">진행중 (검증 미완료 건)</option>
                       </select>
@@ -6170,7 +6225,9 @@ const Dashboard = () => {
                   </div>
 
                   {filteredProjects.length === 0 ? (
-                    <div style={styles.noDataBox}>조건에 부합하는 감사 프로젝트가 없습니다.</div>
+                    <div style={styles.noDataBox}>
+                      {isHead ? `'${userCorp}' 소속의 조회 가능한 감사 프로젝트가 없습니다.` : '조건에 부합하는 감사 프로젝트가 없습니다.'}
+                    </div>
                   ) : (
                     <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
@@ -6182,7 +6239,7 @@ const Dashboard = () => {
                             <th style={{ padding: '10px 12px', width: '60px', textAlign: 'center' }}>차수</th>
                             <th style={{ padding: '10px 12px', width: '110px' }}>마감기한</th>
                             <th style={{ padding: '10px 12px', width: '180px' }}>CAP 검증 진행률</th>
-                            <th style={{ padding: '10px 12px', width: '150px', textAlign: 'center' }}>법인장 확정 상태</th>
+                            <th style={{ padding: '10px 12px', width: '150px', textAlign: 'center' }}>최종 확정 상태</th>
                             <th style={{ padding: '10px 12px', width: '110px', textAlign: 'center' }}>프로젝트 상태</th>
                           </tr>
                         </thead>
@@ -6254,7 +6311,7 @@ const Dashboard = () => {
                                 <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                                   {isHeadConfirmed ? (
                                     <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#16a34a', backgroundColor: '#dcfce7', padding: '3px 8px', borderRadius: '4px', display: 'inline-block' }}>
-                                      ✓ 확정 완료 ({p.headConfirmedBy})
+                                      ✓ 확정 완료 ({getAssigneeName(p.headConfirmedBy)})
                                     </span>
                                   ) : isReady ? (
                                     <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#d97706', backgroundColor: '#fffbeb', padding: '3px 8px', borderRadius: '4px', display: 'inline-block', border: '1px solid #fde68a' }}>
@@ -6311,12 +6368,12 @@ const Dashboard = () => {
 
                     {/* 종합 결재 및 동결(FREEZE) 액션 바 */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'stretch' }}>
-                      {/* 좌측: [요구사항 4] 법인장 최종 확정 (CONFIRM) 영역 */}
+                      {/* 좌측: [요구사항 4] 최종 확정 (CONFIRM) 영역 */}
                       <div style={{ padding: '16px', backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #cbd5e1', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <h4 style={{ margin: 0, fontSize: '14px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span>🏛️</span> [1단계] 법인장 최종 확정 (CONFIRM)
+                              <span>🏛️</span> [1단계] 최종 확정 (CONFIRM)
                             </h4>
                             {currentProj.headConfirmedBy ? (
                               <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '4px' }}>
@@ -6337,7 +6394,7 @@ const Dashboard = () => {
                             {currentProj.headConfirmedBy ? (
                               <div>
                                 <div style={{ color: '#166534', fontWeight: 'bold' }}>
-                                  확정자: {currentProj.headConfirmedBy} ({currentProj.headConfirmedAt ? new Date(currentProj.headConfirmedAt).toLocaleString() : ''})
+                                  확정자: {getAssigneeName(currentProj.headConfirmedBy)} ({currentProj.headConfirmedAt ? new Date(currentProj.headConfirmedAt).toLocaleString() : ''})
                                 </div>
                                 {currentProj.headComment && (
                                   <div style={{ marginTop: '4px', color: '#334155' }}>
@@ -6347,7 +6404,7 @@ const Dashboard = () => {
                               </div>
                             ) : isAllAuditConfirmed ? (
                               <div style={{ color: '#0284c7' }}>
-                                ✓ 모든 지적사항(CAP)의 감사 검증이 완료되었습니다. 아래 버튼을 눌러 법인장 최종 확정(CONFIRM)을 진행해 주십시오.
+                                ✓ 모든 지적사항(CAP)의 감사 검증이 완료되었습니다. 아래 버튼을 눌러 최종 확정(CONFIRM)을 진행해 주십시오.
                               </div>
                             ) : (
                               <div style={{ color: '#dc2626' }}>
@@ -6357,7 +6414,7 @@ const Dashboard = () => {
                           </div>
                         </div>
 
-                        {/* 법인장 확정 버튼 (요구사항 4: 모든 발견사항 조치완료 시에만 활성화) */}
+                        {/* 최종 확정 버튼 (모든 발견사항 조치완료 시에만 활성화) */}
                         <div>
                           {(isHead || user?.role === 'SYSTEM_ADMIN') && !currentProj.headConfirmedBy && (
                             <button
@@ -6381,7 +6438,7 @@ const Dashboard = () => {
                               }}
                             >
                               <span>🏛️</span>
-                              {isAllAuditConfirmed ? '법인장 최종 확정 (CONFIRM 완료)' : '법인장 최종 확정 불가 (미완료 CAP 존재)'}
+                              {isAllAuditConfirmed ? '최종 확정 (CONFIRM 완료)' : '최종 확정 불가 (미완료 CAP 존재)'}
                             </button>
                           )}
                         </div>
@@ -6404,7 +6461,7 @@ const Dashboard = () => {
                               </span>
                             ) : (
                               <span style={{ fontSize: '12px', color: '#94a3b8', backgroundColor: '#f1f5f9', padding: '2px 8px', borderRadius: '4px' }}>
-                                법인장 확정 대기
+                                최종 확정 대기
                               </span>
                             )}
                           </div>
@@ -6413,7 +6470,7 @@ const Dashboard = () => {
                             {currentProj.projectState === 'FREEZE' ? (
                               <div>
                                 <div style={{ color: '#047857', fontWeight: 'bold' }}>
-                                  승인 및 동결 완료 ({currentProj.auditLeaderApprovedBy || '감사팀'} / {currentProj.auditLeaderApprovedAt ? new Date(currentProj.auditLeaderApprovedAt).toLocaleString() : ''})
+                                  승인 및 동결 완료 ({getAssigneeName(currentProj.auditLeaderApprovedBy) || '감사팀'} / {currentProj.auditLeaderApprovedAt ? new Date(currentProj.auditLeaderApprovedAt).toLocaleString() : ''})
                                 </div>
                                 {currentProj.auditLeaderComment && (
                                   <div style={{ marginTop: '4px', color: '#334155' }}>
@@ -6423,17 +6480,17 @@ const Dashboard = () => {
                               </div>
                             ) : currentProj.headConfirmedBy ? (
                               <div style={{ color: '#059669' }}>
-                                ✓ 법인장 최종 확정(CONFIRM)이 완료되었습니다. 감사팀에서 내용을 최종 검토한 후 프로젝트를 동결(FREEZE)할 수 있습니다.
+                                ✓ 최종 확정(CONFIRM)이 완료되었습니다. 감사팀에서 내용을 최종 검토한 후 프로젝트를 동결(FREEZE)할 수 있습니다.
                               </div>
                             ) : (
                               <div style={{ color: '#64748b' }}>
-                                ※ 법인장의 최종 확정(CONFIRM)이 완료된 건에 한하여 감사팀이 최종 승인 및 동결(FREEZE)을 실행할 수 있습니다.
+                                ※ 최종 확정(CONFIRM)이 완료된 건에 한하여 감사팀이 최종 승인 및 동결(FREEZE)을 실행할 수 있습니다.
                               </div>
                             )}
                           </div>
                         </div>
 
-                        {/* 감사팀 FREEZE 버튼 (요구사항 5: 감사팀에서 법인장 CONFIRM된 자료 조회 후 FREEZE) */}
+                        {/* 감사팀 FREEZE 버튼 */}
                         <div>
                           {(isAuditTeam || user?.role === 'SYSTEM_ADMIN') && currentProj.projectState !== 'FREEZE' && (
                             <button
@@ -6457,7 +6514,7 @@ const Dashboard = () => {
                               }}
                             >
                               <span>🔒</span>
-                              {currentProj.headConfirmedBy ? '감사팀 최종 승인 및 동결 (FREEZE 실행)' : '감사팀 동결 불가 (법인장 미확정)'}
+                              {currentProj.headConfirmedBy ? '감사팀 최종 승인 및 동결 (FREEZE 실행)' : '감사팀 동결 불가 (최종 미확정)'}
                             </button>
                           )}
                         </div>
@@ -6489,7 +6546,8 @@ const Dashboard = () => {
                               <th style={{ padding: '10px 12px', width: '50px', textAlign: 'center' }}>No.</th>
                               <th style={{ padding: '10px 12px', width: '90px' }}>분류</th>
                               <th style={{ padding: '10px 12px' }}>지적사항(CAP) 제목</th>
-                              <th style={{ padding: '10px 12px', width: '130px' }}>조치 담당자/부서</th>
+                              {/* [요구사항 2] 조치 담당자 / 부서 컬럼 (이름으로 표기) */}
+                              <th style={{ padding: '10px 12px', width: '160px' }}>조치 담당자 / 부서</th>
                               <th style={{ padding: '10px 12px', width: '100px' }}>조치 기한</th>
                               <th style={{ padding: '10px 12px', width: '100px', textAlign: 'center' }}>피감사 조치상태</th>
                               <th style={{ padding: '10px 12px', width: '120px', textAlign: 'center' }}>감사 검증상태</th>
@@ -6538,8 +6596,11 @@ const Dashboard = () => {
                                       {c.title}
                                     </strong>
                                   </td>
-                                  <td style={{ padding: '10px 12px', fontSize: '12px', color: '#475569' }}>
-                                    {c.assignedUserId} {c.assignedDeptName ? `(${c.assignedDeptName})` : ''}
+                                  {/* [요구사항 2] 조치담당자 / 부서 (코드명이 아닌 사람 이름과 부서명으로 표기) */}
+                                  <td style={{ padding: '10px 12px', fontSize: '12px', color: '#1e293b' }}>
+                                    <span style={{ fontWeight: '500' }}>
+                                      {getAssigneeWithDept(c.assignedUserId, c.assignedDeptName)}
+                                    </span>
                                   </td>
                                   <td style={{ padding: '10px 12px', fontSize: '12px', color: '#64748b' }}>
                                     {c.actionDeadline ? c.actionDeadline.substring(0, 10) : (c.expectedDeadline ? c.expectedDeadline.substring(0, 10) : '-')}
@@ -6609,9 +6670,13 @@ const Dashboard = () => {
                           {currentFinding.title}
                         </h3>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '12px', color: '#64748b' }}>
-                          담당자: <b>{currentFinding.assignedUserId} ({currentFinding.assignedDeptName || '부서미지정'})</b>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* [요구사항 2] 담당자 및 담당부서 이름으로 명확히 표기 */}
+                        <span style={{ fontSize: '12px', color: '#475569' }}>
+                          조치담당자: <b style={{ color: '#1e293b' }}>{getAssigneeName(currentFinding.assignedUserId)}</b>
+                        </span>
+                        <span style={{ fontSize: '12px', color: '#475569' }}>
+                          담당부서: <b style={{ color: '#1e293b' }}>{getDeptName(currentFinding.assignedUserId, currentFinding.assignedDeptName)}</b>
                         </span>
                         <span style={{ fontSize: '12px', color: '#64748b' }}>
                           조치기한: <b>{currentFinding.actionDeadline ? currentFinding.actionDeadline.substring(0, 10) : '미설정'}</b>
@@ -6664,7 +6729,7 @@ const Dashboard = () => {
                           <span>📎</span> 등록된 증빙자료 첨부파일 ({currentAttachments.length}건)
                         </strong>
                         <span style={{ fontSize: '12px', color: '#64748b' }}>
-                          법인장 및 감사팀이 증빙 파일을 직접 다운로드하여 조치 사실을 육안 검증합니다.
+                          증빙 파일을 직접 다운로드하여 조치 사실을 육안 검증합니다.
                         </span>
                       </div>
 
@@ -6693,7 +6758,7 @@ const Dashboard = () => {
                                   📄 {file.fileName}
                                 </div>
                                 <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                                  {file.fileSize ? `${Math.round(file.fileSize / 1024)} KB` : ''} | {file.uploadedBy || '등록자'} | {file.createdAt ? file.createdAt.substring(0, 10) : ''}
+                                  {file.fileSize ? `${Math.round(file.fileSize / 1024)} KB` : ''} | 등록자: {getAssigneeName(file.uploadedBy)} | {file.createdAt ? file.createdAt.substring(0, 10) : ''}
                                 </div>
                               </div>
                               <button
@@ -6759,7 +6824,7 @@ const Dashboard = () => {
                                      h.actionType || '이력'}
                                   </span>
                                   <span style={{ color: '#64748b' }}>
-                                    작업자: <b>{h.actorId || '시스템'}</b>
+                                    작업자: <b>{getActorDisplayName(h.actorId)}</b>
                                   </span>
                                   {h.comments && (
                                     <span style={{ color: '#475569', fontStyle: 'italic' }}>

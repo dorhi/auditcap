@@ -216,7 +216,7 @@ public class MenuService implements CommandLineRunner {
             new DefaultMenuDef("PROJECT_REGISTER", "프로젝트 신규 등록", "감사 업무 관리", 1, "/projects", "📊", 1, "새로운 감사 프로젝트를 생성하고 마감 기한을 정의합니다.", "INTERNAL", null, List.of(UserRole.SYSTEM_ADMIN, UserRole.AUDIT_LEADER, UserRole.AUDITOR)),
             new DefaultMenuDef("ACTION_PLAN_INPUT", "감사 조치계획 & 필수 정보 입력", "감사 업무 관리", 1, "/action-plans", "✏️", 2, "감사 지적 사항에 대한 개선 조치계획 및 증빙을 등록합니다.", "INTERNAL", null, Arrays.asList(UserRole.values())),
             new DefaultMenuDef("FINDING_MANAGEMENT", "감사 지적사항 (CAP) 관리", "감사 업무 관리", 1, "/findings", "🔍", 3, "감사 지적사항 등록 및 부서별 조치내역을 검토/피드백합니다.", "INTERNAL", null, List.of(UserRole.SYSTEM_ADMIN, UserRole.AUDIT_LEADER, UserRole.AUDITOR)),
-            new DefaultMenuDef("HEAD_FINAL_APPROVAL", "법인장 프로젝트 최종 검증 및 확정", "감사 업무 관리", 1, "/head-final-approval", "🏛️", 4, "법인장 및 감사팀이 감사 프로젝트의 모든 CAP 조치 결과를 검증하고 최종 확정(CONFIRM) 및 동결(FREEZE)을 진행하는 전용 화면입니다.", "INTERNAL", null, List.of(UserRole.SYSTEM_ADMIN, UserRole.CORP_HEAD, UserRole.AUDIT_LEADER, UserRole.AUDITOR)),
+            new DefaultMenuDef("HEAD_FINAL_APPROVAL", "프로젝트 최종 검증 및 확정", "감사 업무 관리", 1, "/head-final-approval", "🏛️", 4, "법인장 및 감사팀이 감사 프로젝트의 모든 CAP 조치 결과를 검증하고 최종 확정(CONFIRM) 및 동결(FREEZE)을 진행하는 전용 화면입니다.", "INTERNAL", null, List.of(UserRole.SYSTEM_ADMIN, UserRole.CORP_HEAD, UserRole.AUDIT_LEADER, UserRole.AUDITOR)),
             new DefaultMenuDef("REPORT_MONITORING", "법인별 전체 감사 조치율 보고", "감사 업무 관리", 1, "/reports", "📋", 5, "전체 법인 및 부서별 감사 이행률과 진행 상태를 모니터링합니다.", "INTERNAL", null, Arrays.asList(UserRole.values())),
             
             // 2. 시스템 관리 그룹
@@ -245,6 +245,11 @@ public class MenuService implements CommandLineRunner {
                 log.info("Default menu created: {}", def.menuCode);
             } else {
                 boolean needUpdate = false;
+                // 메뉴명 동기화
+                if (!def.menuName.equals(menu.getMenuName())) {
+                    menu.setMenuName(def.menuName);
+                    needUpdate = true;
+                }
                 // 아이콘 깨짐 복구
                 if (menu.getIcon() == null || menu.getIcon().contains("?") || !menu.getIcon().equals(def.icon)) {
                     menu.setIcon(def.icon);
