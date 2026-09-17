@@ -53,6 +53,7 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 
         // 1. 사내 그룹웨어 뷰(COOLWARE.dbo.CD_MEMBER_V_GW) 실시간 비밀번호 해시(MD5/SHA-256/Base64) 대조
         boolean isGroupwareValid = false;
+        boolean isGroupwareEmployee = false;
         String gwCorpId = "";
         String gwDeptName = "";
         String gwName = "";
@@ -61,6 +62,8 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
         try {
             com.example.cap.dto.GroupwareUserDto gwUser = groupwareService.findGroupwareUser(username);
             if (gwUser != null && gwUser.getPasswd() != null && !gwUser.getPasswd().trim().isEmpty()) {
+                isGroupwareEmployee = true; // 사내 그룹웨어에 등록된 사원임!
+                // 오직 실제 사내 그룹웨어 비밀번호(MD5/SHA-256 Base64 등)로만 일치 여부 검증
                 if (matchesGroupwarePassword(password, gwUser.getPasswd())) {
                     isGroupwareValid = true;
                     gwCorpId = gwUser.getCorpName() != null ? gwUser.getCorpName() : "글로벌세아";
@@ -68,39 +71,17 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
                     gwName = gwUser.getMemberName() != null ? gwUser.getMemberName() : username;
                     gwEmail = gwUser.getEmail() != null ? gwUser.getEmail() : (username + "@sae-a.com");
                     log.info("그룹웨어 뷰(CD_MEMBER_V_GW) 실시간 사내 비밀번호 인증 성공: 사용자={}", username);
+                } else {
+                    log.warn("그룹웨어 뷰(CD_MEMBER_V_GW) 사내 비밀번호 불일치: 사용자={}", username);
                 }
             }
         } catch (Exception gwEx) {
-            log.warn("그룹웨어 뷰(CD_MEMBER_V_GW) 인증 확인 중 오류 (SP 및 로컬 DB 확인으로 전환): {}", gwEx.getMessage());
+            log.warn("그룹웨어 뷰(CD_MEMBER_V_GW) 인증 확인 중 오류: {}", gwEx.getMessage(), gwEx);
         }
 
-        // 2. 그룹웨어 저장 프로시저(sp_check_groupware_login) 호출 시도 (SP가 배포된 환경 지원)
-        if (!isGroupwareValid) {
-            try (Connection conn = dataSource.getConnection()) {
-                String spSql = "{call sp_check_groupware_login(?, ?, ?, ?, ?, ?, ?)}";
-                try (CallableStatement cs = conn.prepareCall(spSql)) {
-                    cs.setString(1, username);
-                    cs.setString(2, password);
-                    cs.registerOutParameter(3, Types.INTEGER);
-                    cs.registerOutParameter(4, Types.VARCHAR);
-                    cs.registerOutParameter(5, Types.VARCHAR);
-                    cs.registerOutParameter(6, Types.VARCHAR);
-                    cs.registerOutParameter(7, Types.VARCHAR);
-
-                    cs.execute();
-                    int isValidResult = cs.getInt(3);
-                    if (isValidResult == 1) {
-                        isGroupwareValid = true;
-                        gwCorpId = cs.getString(4);
-                        gwDeptName = cs.getString(5);
-                        gwName = cs.getString(6);
-                        gwEmail = cs.getString(7);
-                        log.info("그룹웨어 SP(sp_check_groupware_login) 인증 성공: 사용자={}", username);
-                    }
-                }
-            } catch (Exception e) {
-                // SP 미존재 시 무시
-            }
+        // 사내 그룹웨어에 등록된 임직원은 오직 실제 사내 비밀번호로만 로그인 가능 (임시번호/아이디동일/로컬비밀번호 우회 원천 차단)
+        if (isGroupwareEmployee && !isGroupwareValid) {
+            throw new BadCredentialsException("비밀번호가 일치하지 않습니다.");
         }
 
         User systemUser = null;
@@ -202,7 +183,7 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
             return false;
         }
 
-        String target = groupwareHash.trim();
+        String target = groupwareHash.replaceAll("\\s+", "");
 
         // 1. 평문 일치
         if (rawPassword.equals(target)) {
@@ -211,35 +192,42 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 
         try {
             Base64.Encoder b64 = Base64.getEncoder();
-            MessageDigest md5 = MessageDigest.getInstance("MD5");
-            MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
-            MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
-
             String[] charsets = {"UTF-8", "EUC-KR", "MS949", "ISO-8859-1"};
 
             for (String csName : charsets) {
                 Charset cs = Charset.forName(csName);
                 byte[] bytes = rawPassword.getBytes(cs);
 
-                // A. Base64(MD5) - 24자리 (사내 표준)
-                String md5B64 = b64.encodeToString(md5.digest(bytes));
+                // A. Base64(MD5) - 24자리 (사내 쿨웨어 표준)
+                MessageDigest md5 = MessageDigest.getInstance("MD5");
+                byte[] md5Bytes = md5.digest(bytes);
+                String md5B64 = b64.encodeToString(md5Bytes);
                 if (target.equals(md5B64)) return true;
 
                 // B. Base64(SHA-256) - 44자리 (신규 표준)
-                String sha256B64 = b64.encodeToString(sha256.digest(bytes));
+                MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+                byte[] sha256Bytes = sha256.digest(bytes);
+                String sha256B64 = b64.encodeToString(sha256Bytes);
                 if (target.equals(sha256B64)) return true;
 
                 // C. Base64(SHA-1) - 28자리
-                String sha1B64 = b64.encodeToString(sha1.digest(bytes));
+                MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
+                byte[] sha1Bytes = sha1.digest(bytes);
+                String sha1B64 = b64.encodeToString(sha1Bytes);
                 if (target.equals(sha1B64)) return true;
 
                 // D. Hex(MD5) - 32자리
-                String md5Hex = HexFormat.of().formatHex(md5.digest(bytes));
+                String md5Hex = HexFormat.of().formatHex(md5Bytes);
                 if (target.equalsIgnoreCase(md5Hex)) return true;
 
                 // E. Hex(SHA-256) - 64자리
-                String sha256Hex = HexFormat.of().formatHex(sha256.digest(bytes));
+                String sha256Hex = HexFormat.of().formatHex(sha256Bytes);
                 if (target.equalsIgnoreCase(sha256Hex)) return true;
+
+                // F. Hex(MD5) 문자열을 다시 MD5한 Base64
+                MessageDigest md5Second = MessageDigest.getInstance("MD5");
+                String md5HexB64 = b64.encodeToString(md5Second.digest(md5Hex.getBytes(cs)));
+                if (target.equals(md5HexB64)) return true;
             }
         } catch (Exception e) {
             log.warn("그룹웨어 비밀번호 매칭 계산 중 예외: {}", e.getMessage());
