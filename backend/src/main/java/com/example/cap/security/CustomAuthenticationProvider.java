@@ -14,8 +14,12 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.sql.DataSource;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.CallableStatement;
 import java.sql.Connection;
@@ -183,8 +187,12 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
         return UsernamePasswordAuthenticationToken.class.isAssignableFrom(authentication);
     }
 
+    public static final String GW_AES_KEY = "sae-aX9f3LqT7mN1bRwZ6vY2jP0cKdHs";
+    public static final String GW_AES_IV = GW_AES_KEY.substring(0, 16);
+
     /**
-     * 그룹웨어 뷰(CD_MEMBER_V_GW)의 비밀번호 해시(MD5/SHA-256 Base64 등) 일치 여부 검증
+     * 그룹웨어 뷰(CD_MEMBER_V_GW)의 비밀번호 일치 여부 검증
+     * - 사내 표준(ERP_AES_Encrypt.aspx): AES-256-CBC (PKCS7 Padding)
      * - 레거시 쿨웨어 표준: MD5 해시 바이너리의 Base64 인코딩 (24자리)
      * - 신규 표준: SHA-256 해시 바이너리의 Base64 인코딩 (44자리)
      * - 문자셋: UTF-8, EUC-KR, MS949, ISO-8859-1 모두 지원
@@ -203,6 +211,27 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
             return true;
         }
 
+        // 2. [사내 공식 표준] AES-256-CBC 대조 (C# ERP_AES_Encrypt.aspx 호환)
+        try {
+            // A. 암호문 복호화 대조
+            String decrypted = decryptAes256(target);
+            if (decrypted != null && (rawPassword.equals(decrypted) || trimmedPassword.equals(decrypted))) {
+                return true;
+            }
+            // B. 입력값 암호화 대조
+            String encryptedRaw = encryptAes256(rawPassword);
+            if (encryptedRaw != null && target.equals(encryptedRaw)) {
+                return true;
+            }
+            String encryptedTrimmed = encryptAes256(trimmedPassword);
+            if (encryptedTrimmed != null && target.equals(encryptedTrimmed)) {
+                return true;
+            }
+        } catch (Exception e) {
+            log.warn("AES-256 대조 중 예외: {}", e.getMessage());
+        }
+
+        // 3. 레거시 해시(MD5/SHA) 대조
         try {
             Base64.Encoder b64 = Base64.getEncoder();
             String[] charsets = {"UTF-8", "EUC-KR", "MS949", "UTF-16LE", "UTF-16BE", "ISO-8859-1"};
@@ -251,7 +280,41 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
             log.warn("그룹웨어 비밀번호 매칭 계산 중 예외: {}", e.getMessage());
         }
 
-
         return false;
+    }
+
+    /**
+     * 사내 그룹웨어/ERP AES256 CBC PKCS7 암호화 (C# ERP_AES_Encrypt 호환)
+     */
+    public static String encryptAes256(String plainText) {
+        if (plainText == null) plainText = "";
+        try {
+            SecretKeySpec keySpec = new SecretKeySpec(GW_AES_KEY.getBytes(StandardCharsets.UTF_8), "AES");
+            IvParameterSpec ivSpec = new IvParameterSpec(GW_AES_IV.getBytes(StandardCharsets.UTF_8));
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec);
+            byte[] encrypted = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(encrypted);
+        } catch (Exception e) {
+            log.warn("사내 그룹웨어 AES 암호화 실패: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 사내 그룹웨어/ERP AES256 CBC PKCS7 복호화 (C# ERP_AES_Encrypt 호환)
+     */
+    public static String decryptAes256(String cipherText) {
+        if (cipherText == null || cipherText.trim().isEmpty()) return null;
+        try {
+            SecretKeySpec keySpec = new SecretKeySpec(GW_AES_KEY.getBytes(StandardCharsets.UTF_8), "AES");
+            IvParameterSpec ivSpec = new IvParameterSpec(GW_AES_IV.getBytes(StandardCharsets.UTF_8));
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec);
+            byte[] decrypted = cipher.doFinal(Base64.getDecoder().decode(cipherText.trim()));
+            return new String(decrypted, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
