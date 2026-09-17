@@ -17,5 +17,17 @@ public class GroupwareUserDto {
     private String groupName;
     private String email;
     private String corpName;
-}
 
+    // 기존 8개 파라미터 생성자 (하위 호환)
+    public GroupwareUserDto(String memberId, String passwd, String memberName, String memberNameKor, String memberNameEng, String groupName, String email, String corpName) {
+        this.memberId = memberId;
+        this.passwd = passwd;
+        this.gwLoginPwd = null;
+        this.memberName = memberName;
+        this.memberNameKor = memberNameKor;
+        this.memberNameEng = memberNameEng;
+        this.groupName = groupName;
+        this.email = email;
+        this.corpName = corpName;
+    }
+}
