@@ -2,6 +2,9 @@
 # 민감 정보 및 사내 문서 차단
 # ==========================================
 *.pptx
+!manuals_ppt/*.pptx
+!backend/src/main/resources/manuals/*.pptx
+!frontend/public/manuals/*.pptx
 *.ppt
 *.xlsx
 *.xls
@@ -45,3 +48,5 @@ frontend/*.local
 *.iml
 .DS_Store
 Thumbs.db
+~$*
+

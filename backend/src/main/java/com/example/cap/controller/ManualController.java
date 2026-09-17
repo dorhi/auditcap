@@ -61,10 +61,11 @@ public class ManualController {
             if (p == null || p.trim().isEmpty()) continue;
             try {
                 File file = new File(p);
-                if (file.exists() && file.isFile() && file.length() > 0) {
+                // 최소 10KB 이상이어야 정상 PPTX 파일로 인정 (1KB짜리 HTML 오류 파일 배제)
+                if (file.exists() && file.isFile() && file.length() > 10000) {
                     try (FileInputStream fis = new FileInputStream(file)) {
                         fileBytes = fis.readAllBytes();
-                        if (fileBytes != null && fileBytes.length > 0) {
+                        if (fileBytes != null && fileBytes.length > 10000) {
                             log.info("통합 매뉴얼 파일 로드 성공 (경로: {}, 크기: {} bytes)", p, fileBytes.length);
                             break;
                         }
@@ -75,14 +76,17 @@ public class ManualController {
             }
         }
 
-        // 2. 클래스패스 탐색 (JAR 패키징 내부 fallback)
-        if (fileBytes == null) {
+        // 2. 클래스패스 탐색 (JAR 패키징 내부 fallback - 83KB 원본 보장)
+        if (fileBytes == null || fileBytes.length < 10000) {
             try {
                 ClassPathResource cpr = new ClassPathResource("manuals/" + PPT_FILENAME);
                 if (cpr.exists()) {
                     try (InputStream is = cpr.getInputStream()) {
-                        fileBytes = is.readAllBytes();
-                        log.info("통합 매뉴얼 파일 클래스패스에서 로드 성공 (크기: {} bytes)", fileBytes.length);
+                        byte[] cpBytes = is.readAllBytes();
+                        if (cpBytes != null && cpBytes.length > 10000) {
+                            fileBytes = cpBytes;
+                            log.info("통합 매뉴얼 파일 클래스패스에서 로드 성공 (크기: {} bytes)", fileBytes.length);
+                        }
                     }
                 }
             } catch (Exception ex) {
@@ -90,26 +94,30 @@ public class ManualController {
             }
         }
 
-        if (fileBytes == null) {
-            log.error("통합 매뉴얼 파일을 모든 경로(/data/auditcap 등)에서 찾을 수 없습니다.");
+        if (fileBytes == null || fileBytes.length < 10000) {
+            log.error("통합 매뉴얼 파일을 모든 경로(/data/auditcap 및 클래스패스)에서 찾을 수 없습니다.");
             return ResponseEntity.notFound().build();
         }
 
-        // 3. 우분투 서버 /data/auditcap 폴더가 존재하고 파일이 비어있는 경우 자동 보존(동기화) 시도
+        // 3. 우분투 서버 /data/auditcap 폴더에 정상 매뉴얼 파일 자동 보존 및 복구 동기화
         try {
-            File dataAuditcapDir = new File("/data/auditcap");
-            if (dataAuditcapDir.exists() && dataAuditcapDir.isDirectory() && dataAuditcapDir.canWrite()) {
-                File targetPpt = new File(dataAuditcapDir, PPT_FILENAME);
-                if (!targetPpt.exists() || targetPpt.length() == 0) {
-                    try (FileOutputStream fos = new FileOutputStream(targetPpt)) {
-                        fos.write(fileBytes);
-                        targetPpt.setReadable(true, false);
-                        log.info("우분투 서버 /data/auditcap/ 에 매뉴얼 파일 자동 동기화 완료: {}", targetPpt.getAbsolutePath());
+            String[] targetDirs = {"/data/auditcap", "/app/uploads"};
+            for (String dirPath : targetDirs) {
+                File dir = new File(dirPath);
+                if (dir.exists() && dir.isDirectory() && dir.canWrite()) {
+                    File targetPpt = new File(dir, PPT_FILENAME);
+                    // 파일이 없거나 10KB 미만(손상본)인 경우 정상 파일로 덮어쓰기 복구
+                    if (!targetPpt.exists() || targetPpt.length() < 10000) {
+                        try (FileOutputStream fos = new FileOutputStream(targetPpt)) {
+                            fos.write(fileBytes);
+                            targetPpt.setReadable(true, false);
+                            log.info("서버 {} 에 정상 통합 매뉴얼 파일 자동 복구 완료: {}", dirPath, targetPpt.getAbsolutePath());
+                        }
                     }
                 }
             }
         } catch (Exception ex) {
-            log.debug("/data/auditcap 자동 복사 무시: {}", ex.getMessage());
+            log.debug("서버 매뉴얼 자동 복사 무시: {}", ex.getMessage());
         }
 
         try {

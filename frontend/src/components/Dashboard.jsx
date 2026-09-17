@@ -1844,6 +1844,11 @@ const Dashboard = () => {
         validateStatus: (status) => status === 200
       });
 
+      // HTML 응답이거나 파일 크기가 비정상적인 경우 예외 처리
+      if (!res.data || res.data.size < 5000 || (res.data.type && res.data.type.includes('html'))) {
+        throw new Error('백엔드 매뉴얼 파일 응답이 유효하지 않습니다.');
+      }
+
       const blob = new Blob([res.data], {
         type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
       });
@@ -1854,7 +1859,6 @@ const Dashboard = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      // 브라우저가 디스크 저장을 마칠 때까지 넉넉하게 30초 후 해제
       setTimeout(() => {
         window.URL.revokeObjectURL(downloadUrl);
       }, 30000);
@@ -1863,8 +1867,18 @@ const Dashboard = () => {
       console.warn('API 다운로드 실패, 프론트 정적 매뉴얼 다운로드 fallback 시도:', apiErr);
       try {
         const staticRes = await fetch('/manuals/SAE-A_CAP_Integrated_Manual.pptx');
-        if (!staticRes.ok) throw new Error('Static file not available');
+        if (!staticRes.ok) throw new Error('Static file not available (status: ' + staticRes.status + ')');
+        
+        const contentType = staticRes.headers.get('content-type') || '';
+        if (contentType.includes('text/html')) {
+          throw new Error('정적 매뉴얼 파일이 존재하지 않아 HTML로 반환되었습니다.');
+        }
+
         const blob = await staticRes.blob();
+        if (blob.size < 5000) {
+          throw new Error('정적 매뉴얼 파일 크기가 유효하지 않습니다 (' + blob.size + ' bytes).');
+        }
+
         const downloadUrl = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = downloadUrl;
