@@ -297,3 +297,33 @@ BEGIN
         ALTER TABLE CAPS_PROJECTS ADD round INT NULL DEFAULT 1;
     END
 END
+
+-- 16. CAPS_ACCESS_LOGS (시스템 접속 및 사용 감사 로그) 테이블 생성
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CAPS_ACCESS_LOGS')
+BEGIN
+    CREATE TABLE CAPS_ACCESS_LOGS (
+        log_id BIGINT IDENTITY(1,1) NOT NULL,
+        log_type VARCHAR(30) NOT NULL,
+        username VARCHAR(50) NULL,
+        user_name NVARCHAR(50) NULL,
+        corp_id VARCHAR(50) NULL,
+        dept_name NVARCHAR(100) NULL,
+        role VARCHAR(30) NULL,
+        target_menu_code VARCHAR(50) NULL,
+        target_menu_name NVARCHAR(100) NULL,
+        action_details NVARCHAR(500) NULL,
+        status VARCHAR(20) NOT NULL CONSTRAINT DF_CAPS_ACCESS_LOGS_status DEFAULT 'SUCCESS',
+        failure_reason NVARCHAR(500) NULL,
+        client_ip VARCHAR(50) NULL,
+        user_agent NVARCHAR(300) NULL,
+        created_at DATETIME2 NOT NULL,
+        CONSTRAINT PK_CAPS_ACCESS_LOGS PRIMARY KEY (log_id)
+    );
+
+    CREATE INDEX IDX_ACCESS_LOGS_CREATED_AT ON CAPS_ACCESS_LOGS (created_at DESC);
+    CREATE INDEX IDX_ACCESS_LOGS_TYPE ON CAPS_ACCESS_LOGS (log_type);
+    CREATE INDEX IDX_ACCESS_LOGS_USERNAME ON CAPS_ACCESS_LOGS (username);
+    CREATE INDEX IDX_ACCESS_LOGS_STATUS ON CAPS_ACCESS_LOGS (status);
+
+    PRINT 'SUCCESS: CAPS_ACCESS_LOGS 테이블 및 인덱스가 생성되었습니다.';
+END

@@ -114,7 +114,7 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
             // 2-B. 그룹웨어 SP에서 조회가 되지 않은 경우 -> 기본 사용자 계정관리(CAPS_USERS)에서 확인
             log.info("그룹웨어 SP 미조회 -> 기본 사용자 계정관리(CAPS_USERS)에서 확인 진행: 사용자={}", username);
             systemUser = userRepository.findByUsername(username)
-                    .orElseThrow(() -> new BadCredentialsException("등록되지 않은 사용자 ID이거나 비밀번호가 일치하지 않습니다."));
+                    .orElseThrow(() -> new BadCredentialsException("등록되지 않은 사용자 ID (존재하지 않는 계정)"));
 
             // 기본 사용자 계정관리 비밀번호 일치 검증 (BCrypt 검증 및 평문 하위호환)
             boolean passwordMatches = false;

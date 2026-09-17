@@ -36,6 +36,7 @@ public class AuthController {
     private final TotpService totpService;
     private final GroupwareService groupwareService;
     private final UserRepository userRepository;
+    private final com.example.cap.service.AccessLogService accessLogService;
 
     @Value("${app.otp.issuer}")
     private String otpIssuer;
@@ -43,9 +44,13 @@ public class AuthController {
     /**
      * 1차 로그인 API (ID/PW -> SP 검증)
      * 성공 시 임시 JWT 토큰 발급 (2FA 인증 필요 상태)
+     * 로그인 성공 및 실패 감사 로그(실패 사유 포함) 자동 기록
      */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
+        String clientIp = AccessLogController.getClientIp(httpRequest);
+        String userAgent = httpRequest != null ? httpRequest.getHeader("User-Agent") : "";
+
         try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
@@ -80,6 +85,21 @@ public class AuthController {
                     userName
             );
 
+            // [감사 로그] 로그인 성공 기록
+            try {
+                accessLogService.recordLoginSuccess(
+                        userInfo.getUsername(),
+                        userName,
+                        userCorp,
+                        userDept,
+                        userRole,
+                        clientIp,
+                        userAgent
+                );
+            } catch (Exception logEx) {
+                // 로그 저장 실패가 로그인 전체를 방해하지 않음
+            }
+
             Map<String, Object> response = new HashMap<>();
             response.put("accessToken", finalToken);
             response.put("username", userInfo.getUsername());
@@ -92,6 +112,19 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             String errorMsg = e.getMessage() != null ? e.getMessage() : "로그인 인증에 실패했습니다.";
+
+            // [감사 로그] 로그인 실패 사유 기록
+            try {
+                accessLogService.recordLoginFailure(
+                        request.getUsername(),
+                        errorMsg,
+                        clientIp,
+                        userAgent
+                );
+            } catch (Exception logEx) {
+                // 로그 저장 실패 무시
+            }
+
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "LOGIN_FAILED", "message", errorMsg));
         }

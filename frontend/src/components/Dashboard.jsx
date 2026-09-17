@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthProvider';
 import axios from 'axios';
 import MenuManagement from './MenuManagement';
 import RolePermissionManagement from './RolePermissionManagement';
+import AccessLogManagement from './AccessLogManagement';
 import CustomScreenView from './CustomScreenView';
 import SaeALogo from './common/SaeALogo';
 
@@ -187,6 +188,7 @@ const Dashboard = () => {
     USER_MANAGEMENT: '',
     MENU_MANAGEMENT: '',
     ROLE_PERMISSION_MANAGEMENT: '',
+    AUDIT_LOG_MANAGEMENT: '',
   };
 
   // 사용자 권한 한글 명칭 및 정렬 순서 정의 (영문 제거 및 신규 명칭 적용)
@@ -247,6 +249,7 @@ const Dashboard = () => {
       6: 'MENU_MANAGEMENT',
       7: 'ROLE_PERMISSION_MANAGEMENT',
       8: 'HEAD_FINAL_APPROVAL',
+      9: 'AUDIT_LOG_MANAGEMENT',
     };
     if (codeNumMap[activeMenu] === targetCode) return true;
     if (codeNumMap[targetCode] === activeMenu) return true;
@@ -275,6 +278,7 @@ const Dashboard = () => {
       { id: 5, menuCode: 'USER_MANAGEMENT', menuName: '사용자 계정 관리', groupName: '시스템 관리', groupOrder: 2, icon: '', sortOrder: 1, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'AUDIT_LEADER'] },
       { id: 6, menuCode: 'MENU_MANAGEMENT', menuName: '화면 / 메뉴 관리', groupName: '시스템 관리', groupOrder: 2, icon: '', sortOrder: 2, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN'] },
       { id: 7, menuCode: 'ROLE_PERMISSION_MANAGEMENT', menuName: '역할별 화면 접근 관리', groupName: '시스템 관리', groupOrder: 2, icon: '', sortOrder: 3, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN'] },
+      { id: 9, menuCode: 'AUDIT_LOG_MANAGEMENT', menuName: '시스템 접속 및 사용 로그', groupName: '시스템 관리', groupOrder: 2, icon: '', sortOrder: 4, screenType: 'INTERNAL', allowedRoles: ['SYSTEM_ADMIN', 'AUDIT_LEADER'] },
     ];
     return all.filter(m => m.allowedRoles.includes(role));
   };
@@ -318,6 +322,41 @@ const Dashboard = () => {
       setActiveMenu('HEAD_FINAL_APPROVAL');
     }
   }, [user?.role]);
+
+  // [감사 로그] 사용자의 화면(메뉴) 접속 이벤트 실시간 자동 추적
+  useEffect(() => {
+    if (!activeMenu || !user?.username) return;
+
+    const findMenuName = () => {
+      const target = userMenus.find(m => m.menuCode === activeMenu || m.id === activeMenu);
+      if (target) return target.menuName;
+      const map = {
+        PROJECT_REGISTER: '프로젝트 신규 등록',
+        ACTION_PLAN_INPUT: '감사 조치계획 & 필수 정보 입력',
+        FINDING_MANAGEMENT: '감사 지적사항 (CAP) 관리',
+        HEAD_FINAL_APPROVAL: '프로젝트 최종 검증 및 확정',
+        REPORT_MONITORING: '법인별 전체 감사 조치율 보고',
+        USER_MANAGEMENT: '사용자 계정 관리',
+        MENU_MANAGEMENT: '화면 / 메뉴 관리',
+        ROLE_PERMISSION_MANAGEMENT: '역할별 화면 접근 관리',
+        AUDIT_LOG_MANAGEMENT: '시스템 접속 및 사용 로그'
+      };
+      return map[activeMenu] || String(activeMenu);
+    };
+
+    const menuName = findMenuName();
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      axios.post('/api/logs/page-access', {
+        menuCode: String(activeMenu),
+        menuName: menuName
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(() => {
+        // 화면 전환에 영향 없도록 무시
+      });
+    }
+  }, [activeMenu, user?.username, userMenus]);
 
   // userMenus를 groupName 기준으로 묶어 정렬
   const groupedUserMenus = useMemo(() => {
@@ -2286,6 +2325,7 @@ const Dashboard = () => {
               if (isMenuActive('USER_MANAGEMENT')) return '사용자 계정 관리';
               if (isMenuActive('MENU_MANAGEMENT')) return '화면 및 메뉴 관리';
               if (isMenuActive('ROLE_PERMISSION_MANAGEMENT')) return '역할별 화면 접근 권한 관리';
+              if (isMenuActive('AUDIT_LOG_MANAGEMENT')) return '시스템 접속 및 사용 감사 로그';
               return '화면 뷰어';
             })()}
           </h2>
@@ -6546,6 +6586,15 @@ const Dashboard = () => {
           {/* ================================================================= */}
           {isMenuActive('ROLE_PERMISSION_MANAGEMENT') && (
             <RolePermissionManagement onPermissionChange={fetchUserMenus} />
+          )}
+
+          {/* ================================================================= */}
+          {/* 9번 탭: 시스템 접속 및 사용 감사 로그 관리 (SYSTEM_ADMIN, AUDIT_LEADER 전용) */}
+          {/* ================================================================= */}
+          {isMenuActive('AUDIT_LOG_MANAGEMENT') && (
+            <div style={styles.containerCol}>
+              <AccessLogManagement />
+            </div>
           )}
 
           {/* ================================================================= */}

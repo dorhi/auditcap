@@ -20,6 +20,7 @@ const DEFAULT_ICONS = {
   USER_MANAGEMENT: '👤',
   MENU_MANAGEMENT: '🖥️',
   ROLE_PERMISSION_MANAGEMENT: '🔐',
+  AUDIT_LOG_MANAGEMENT: '📋',
 };
 
 const getMenuIcon = (menu) => {

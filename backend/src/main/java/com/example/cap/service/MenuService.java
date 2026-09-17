@@ -222,7 +222,8 @@ public class MenuService implements CommandLineRunner {
             // 2. 시스템 관리 그룹
             new DefaultMenuDef("USER_MANAGEMENT", "사용자 계정 관리", "시스템 관리", 2, "/users", "👤", 1, "임직원 계정 승인 및 역할/사용상태를 관리합니다.", "INTERNAL", null, List.of(UserRole.SYSTEM_ADMIN, UserRole.AUDIT_LEADER)),
             new DefaultMenuDef("MENU_MANAGEMENT", "화면 / 메뉴 관리", "시스템 관리", 2, "/menus", "🖥️", 2, "시스템 내 화면 및 메뉴 목록을 등록/수정/삭제합니다.", "INTERNAL", null, List.of(UserRole.SYSTEM_ADMIN)),
-            new DefaultMenuDef("ROLE_PERMISSION_MANAGEMENT", "역할별 화면 접근 관리", "시스템 관리", 2, "/permissions", "🔐", 3, "사용자 역할(Role)별 접근 가능한 화면을 매트릭스로 제어합니다.", "INTERNAL", null, List.of(UserRole.SYSTEM_ADMIN))
+            new DefaultMenuDef("ROLE_PERMISSION_MANAGEMENT", "역할별 화면 접근 관리", "시스템 관리", 2, "/permissions", "🔐", 3, "사용자 역할(Role)별 접근 가능한 화면을 매트릭스로 제어합니다.", "INTERNAL", null, List.of(UserRole.SYSTEM_ADMIN)),
+            new DefaultMenuDef("AUDIT_LOG_MANAGEMENT", "시스템 접속 및 사용 로그", "시스템 관리", 2, "/logs", "📋", 4, "로그인 성공/실패 사유 및 화면별 접속 감사 로그를 모니터링합니다.", "INTERNAL", null, List.of(UserRole.SYSTEM_ADMIN, UserRole.AUDIT_LEADER))
         );
 
         for (DefaultMenuDef def : defaults) {
