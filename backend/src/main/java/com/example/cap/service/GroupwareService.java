@@ -29,11 +29,13 @@ public class GroupwareService {
 
         String searchId = memberId.trim();
 
-        // 1. CD_MEMBER_V_GW 뷰에서 조회
+        // 1. CD_MEMBER_V_GW 뷰 및 saea_gw_db.dbo.ORG_EMPLOYEE(웹 그룹웨어)에서 조회
         try (Connection conn = dataSource.getConnection()) {
-            String sql = "SELECT MEMBERID, Passwd, MEMBERNAME, MEMBERNAME_KOR, MEMBERNAME_ENG, GROUPNAME, EMAIL, SAEA_CNAME " +
-                         "FROM COOLWARE.dbo.CD_MEMBER_V_GW " +
-                         "WHERE LTRIM(RTRIM(MEMBERID)) = ? OR UPPER(LTRIM(RTRIM(MEMBERID))) = UPPER(?)";
+            String sql = "SELECT gw.MEMBERID, gw.Passwd, oe.LOGIN_PWD, gw.MEMBERNAME, gw.MEMBERNAME_KOR, gw.MEMBERNAME_ENG, gw.GROUPNAME, gw.EMAIL, gw.SAEA_CNAME " +
+                         "FROM COOLWARE.dbo.CD_MEMBER_V_GW gw WITH (NOLOCK) " +
+                         "LEFT JOIN saea_gw_db.dbo.ORG_EMPLOYEE oe WITH (NOLOCK) " +
+                         "  ON UPPER(LTRIM(RTRIM(oe.USER_ID))) = UPPER(LTRIM(RTRIM(gw.MEMBERID))) " +
+                         "WHERE LTRIM(RTRIM(gw.MEMBERID)) = ? OR UPPER(LTRIM(RTRIM(gw.MEMBERID))) = UPPER(?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, searchId);
                 ps.setString(2, searchId);
@@ -42,6 +44,7 @@ public class GroupwareService {
                         GroupwareUserDto dto = new GroupwareUserDto();
                         dto.setMemberId(rs.getString("MEMBERID") != null ? rs.getString("MEMBERID").trim() : searchId);
                         dto.setPasswd(rs.getString("Passwd") != null ? rs.getString("Passwd").trim() : "");
+                        dto.setGwLoginPwd(rs.getString("LOGIN_PWD") != null ? rs.getString("LOGIN_PWD").trim() : "");
                         dto.setMemberName(rs.getString("MEMBERNAME"));
                         dto.setMemberNameKor(rs.getString("MEMBERNAME_KOR"));
                         dto.setMemberNameEng(rs.getString("MEMBERNAME_ENG"));
@@ -53,8 +56,9 @@ public class GroupwareService {
                 }
             }
         } catch (Exception e) {
-            log.warn("CD_MEMBER_V_GW 단일 사원 조회 실패 (ID: {}): {}", searchId, e.getMessage());
+            log.warn("그룹웨어 사원 조회 실패 (ID: {}): {}", searchId, e.getMessage());
         }
+
 
         // 2. 로컬 DB(CAPS_USERS)에서 보완 조회
         try {

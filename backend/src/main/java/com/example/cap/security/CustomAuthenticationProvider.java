@@ -51,7 +51,7 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 
         username = username.trim();
 
-        // 1. 사내 그룹웨어 뷰(COOLWARE.dbo.CD_MEMBER_V_GW) 실시간 비밀번호 해시(MD5/SHA-256/Base64) 대조
+        // 1. 사내 그룹웨어 실시간 비밀번호 대조 (웹 포털 LOGIN_PWD 및 ERP Passwd)
         boolean isGroupwareValid = false;
         boolean isGroupwareEmployee = false;
         String gwCorpId = "";
@@ -61,23 +61,35 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 
         try {
             com.example.cap.dto.GroupwareUserDto gwUser = groupwareService.findGroupwareUser(username);
-            if (gwUser != null && gwUser.getPasswd() != null && !gwUser.getPasswd().trim().isEmpty()) {
+            boolean hasGwPw = (gwUser != null) && (
+                (gwUser.getPasswd() != null && !gwUser.getPasswd().trim().isEmpty()) ||
+                (gwUser.getGwLoginPwd() != null && !gwUser.getGwLoginPwd().trim().isEmpty())
+            );
+
+            if (gwUser != null && hasGwPw) {
                 isGroupwareEmployee = true; // 사내 그룹웨어에 등록된 사원임!
-                // 오직 실제 사내 그룹웨어 비밀번호(MD5/SHA-256 Base64 등)로만 일치 여부 검증
-                if (matchesGroupwarePassword(password, gwUser.getPasswd())) {
+
+                // 실제 사내 웹 그룹웨어 포털 비밀번호(ORG_EMPLOYEE.LOGIN_PWD) 또는 ERP 비밀번호(CD_MEMBER_V_GW.Passwd) 매칭 검증
+                boolean matchWebGw = gwUser.getGwLoginPwd() != null && !gwUser.getGwLoginPwd().isEmpty()
+                        && matchesGroupwarePassword(password, gwUser.getGwLoginPwd());
+                boolean matchErpGw = gwUser.getPasswd() != null && !gwUser.getPasswd().isEmpty()
+                        && matchesGroupwarePassword(password, gwUser.getPasswd());
+
+                if (matchWebGw || matchErpGw) {
                     isGroupwareValid = true;
                     gwCorpId = gwUser.getCorpName() != null ? gwUser.getCorpName() : "글로벌세아";
                     gwDeptName = gwUser.getGroupName() != null ? gwUser.getGroupName() : "현업부서";
                     gwName = gwUser.getMemberName() != null ? gwUser.getMemberName() : username;
                     gwEmail = gwUser.getEmail() != null ? gwUser.getEmail() : (username + "@sae-a.com");
-                    log.info("그룹웨어 뷰(CD_MEMBER_V_GW) 실시간 사내 비밀번호 인증 성공: 사용자={}", username);
+                    log.info("그룹웨어 실시간 사내 비밀번호 인증 성공: 사용자={} (웹GW매칭={}, ERP매칭={})", username, matchWebGw, matchErpGw);
                 } else {
-                    log.warn("그룹웨어 뷰(CD_MEMBER_V_GW) 사내 비밀번호 불일치: 사용자={}", username);
+                    log.warn("그룹웨어 사내 비밀번호 불일치: 사용자={}", username);
                 }
             }
         } catch (Exception gwEx) {
-            log.warn("그룹웨어 뷰(CD_MEMBER_V_GW) 인증 확인 중 오류: {}", gwEx.getMessage(), gwEx);
+            log.warn("그룹웨어 인증 확인 중 오류: {}", gwEx.getMessage(), gwEx);
         }
+
 
         // 사내 그룹웨어에 등록된 임직원은 오직 실제 사내 비밀번호로만 로그인 가능 (임시번호/아이디동일/로컬비밀번호 우회 원천 차단)
         if (isGroupwareEmployee && !isGroupwareValid) {

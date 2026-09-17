@@ -9,7 +9,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class GroupwareUserDto {
     private String memberId;
-    private String passwd;
+    private String passwd;        // ERP_LOGIN_PWD (MD5 Base64 등)
+    private String gwLoginPwd;    // ORG_EMPLOYEE.LOGIN_PWD (그룹웨어 웹 포털 SHA-256 Hex 등)
     private String memberName;
     private String memberNameKor;
     private String memberNameEng;
@@ -17,3 +18,4 @@ public class GroupwareUserDto {
     private String email;
     private String corpName;
 }
+
