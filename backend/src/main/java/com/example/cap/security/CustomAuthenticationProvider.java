@@ -15,10 +15,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.Types;
+import java.util.Base64;
 import java.util.Collections;
+import java.util.HexFormat;
 
 @Slf4j
 @Component
@@ -27,11 +31,13 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
     private final DataSource dataSource;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.example.cap.service.GroupwareService groupwareService;
 
-    public CustomAuthenticationProvider(DataSource dataSource, UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public CustomAuthenticationProvider(DataSource dataSource, UserRepository userRepository, PasswordEncoder passwordEncoder, com.example.cap.service.GroupwareService groupwareService) {
         this.dataSource = dataSource;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.groupwareService = groupwareService;
     }
 
     @Override
@@ -45,40 +51,56 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 
         username = username.trim();
 
-        // 1. 사내 그룹웨어 DB 조회용 Stored Procedure (sp_check_groupware_login) 호출 시도
-        // JPA/Hibernate 트랜잭션 오염(rollback-only) 방지를 위해 독립 JDBC Connection으로 안전하게 실행
-        // IN: @username, @password / OUT: @isValid, @corpId, @deptName, @name, @email
+        // 1. 사내 그룹웨어 뷰(COOLWARE.dbo.CD_MEMBER_V_GW) 실시간 비밀번호 해시(MD5/SHA-256/Base64) 대조
         boolean isGroupwareValid = false;
         String gwCorpId = "";
         String gwDeptName = "";
         String gwName = "";
         String gwEmail = "";
 
-        try (Connection conn = dataSource.getConnection()) {
-            String spSql = "{call sp_check_groupware_login(?, ?, ?, ?, ?, ?, ?)}";
-            try (CallableStatement cs = conn.prepareCall(spSql)) {
-                cs.setString(1, username);
-                cs.setString(2, password);
-                cs.registerOutParameter(3, Types.INTEGER);
-                cs.registerOutParameter(4, Types.VARCHAR);
-                cs.registerOutParameter(5, Types.VARCHAR);
-                cs.registerOutParameter(6, Types.VARCHAR);
-                cs.registerOutParameter(7, Types.VARCHAR);
-
-                cs.execute();
-                int isValidResult = cs.getInt(3);
-                if (isValidResult == 1) {
+        try {
+            com.example.cap.dto.GroupwareUserDto gwUser = groupwareService.findGroupwareUser(username);
+            if (gwUser != null && gwUser.getPasswd() != null && !gwUser.getPasswd().trim().isEmpty()) {
+                if (matchesGroupwarePassword(password, gwUser.getPasswd())) {
                     isGroupwareValid = true;
-                    gwCorpId = cs.getString(4);
-                    gwDeptName = cs.getString(5);
-                    gwName = cs.getString(6);
-                    gwEmail = cs.getString(7);
-                    log.info("그룹웨어(sp_check_groupware_login) 인증 성공: 사용자={}", username);
+                    gwCorpId = gwUser.getCorpName() != null ? gwUser.getCorpName() : "글로벌세아";
+                    gwDeptName = gwUser.getGroupName() != null ? gwUser.getGroupName() : "현업부서";
+                    gwName = gwUser.getMemberName() != null ? gwUser.getMemberName() : username;
+                    gwEmail = gwUser.getEmail() != null ? gwUser.getEmail() : (username + "@sae-a.com");
+                    log.info("그룹웨어 뷰(CD_MEMBER_V_GW) 실시간 사내 비밀번호 인증 성공: 사용자={}", username);
                 }
             }
-        } catch (Exception e) {
-            // DB에 SP가 존재하지 않거나 호출 중 에러가 발생해도 JPA 트랜잭션에 영향을 주지 않고 2단계(기본 계정관리)로 안전하게 전환
-            log.warn("그룹웨어 SP(sp_check_groupware_login) 호출 불가 또는 예외 (기본 사용자 계정관리 확인으로 전환): {}", e.getMessage());
+        } catch (Exception gwEx) {
+            log.warn("그룹웨어 뷰(CD_MEMBER_V_GW) 인증 확인 중 오류 (SP 및 로컬 DB 확인으로 전환): {}", gwEx.getMessage());
+        }
+
+        // 2. 그룹웨어 저장 프로시저(sp_check_groupware_login) 호출 시도 (SP가 배포된 환경 지원)
+        if (!isGroupwareValid) {
+            try (Connection conn = dataSource.getConnection()) {
+                String spSql = "{call sp_check_groupware_login(?, ?, ?, ?, ?, ?, ?)}";
+                try (CallableStatement cs = conn.prepareCall(spSql)) {
+                    cs.setString(1, username);
+                    cs.setString(2, password);
+                    cs.registerOutParameter(3, Types.INTEGER);
+                    cs.registerOutParameter(4, Types.VARCHAR);
+                    cs.registerOutParameter(5, Types.VARCHAR);
+                    cs.registerOutParameter(6, Types.VARCHAR);
+                    cs.registerOutParameter(7, Types.VARCHAR);
+
+                    cs.execute();
+                    int isValidResult = cs.getInt(3);
+                    if (isValidResult == 1) {
+                        isGroupwareValid = true;
+                        gwCorpId = cs.getString(4);
+                        gwDeptName = cs.getString(5);
+                        gwName = cs.getString(6);
+                        gwEmail = cs.getString(7);
+                        log.info("그룹웨어 SP(sp_check_groupware_login) 인증 성공: 사용자={}", username);
+                    }
+                }
+            } catch (Exception e) {
+                // SP 미존재 시 무시
+            }
         }
 
         User systemUser = null;
@@ -92,6 +114,7 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
                 if (gwCorpId != null && !gwCorpId.isEmpty()) systemUser.setCorpId(gwCorpId);
                 if (gwDeptName != null && !gwDeptName.isEmpty()) systemUser.setDeptName(gwDeptName);
                 if (gwEmail != null && !gwEmail.isEmpty()) systemUser.setEmail(gwEmail);
+                systemUser.setPassword(passwordEncoder.encode(password)); // 사내 비밀번호로 로컬 비밀번호도 동기화!
                 userRepository.save(systemUser);
             } else {
                 // 로컬 DB에 아직 없는 그룹웨어 사원이면 자동 동기화 등록 (승인완료 상태)
@@ -165,5 +188,63 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
     @Override
     public boolean supports(Class<?> authentication) {
         return UsernamePasswordAuthenticationToken.class.isAssignableFrom(authentication);
+    }
+
+    /**
+     * 그룹웨어 뷰(CD_MEMBER_V_GW)의 비밀번호 해시(MD5/SHA-256 Base64 등) 일치 여부 검증
+     * - 레거시 쿨웨어 표준: MD5 해시 바이너리의 Base64 인코딩 (24자리)
+     * - 신규 표준: SHA-256 해시 바이너리의 Base64 인코딩 (44자리)
+     * - 문자셋: UTF-8, EUC-KR, MS949, ISO-8859-1 모두 지원
+     * - Hex 및 평문 하위호환 지원
+     */
+    public static boolean matchesGroupwarePassword(String rawPassword, String groupwareHash) {
+        if (rawPassword == null || groupwareHash == null || groupwareHash.trim().isEmpty()) {
+            return false;
+        }
+
+        String target = groupwareHash.trim();
+
+        // 1. 평문 일치
+        if (rawPassword.equals(target)) {
+            return true;
+        }
+
+        try {
+            Base64.Encoder b64 = Base64.getEncoder();
+            MessageDigest md5 = MessageDigest.getInstance("MD5");
+            MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+            MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
+
+            String[] charsets = {"UTF-8", "EUC-KR", "MS949", "ISO-8859-1"};
+
+            for (String csName : charsets) {
+                Charset cs = Charset.forName(csName);
+                byte[] bytes = rawPassword.getBytes(cs);
+
+                // A. Base64(MD5) - 24자리 (사내 표준)
+                String md5B64 = b64.encodeToString(md5.digest(bytes));
+                if (target.equals(md5B64)) return true;
+
+                // B. Base64(SHA-256) - 44자리 (신규 표준)
+                String sha256B64 = b64.encodeToString(sha256.digest(bytes));
+                if (target.equals(sha256B64)) return true;
+
+                // C. Base64(SHA-1) - 28자리
+                String sha1B64 = b64.encodeToString(sha1.digest(bytes));
+                if (target.equals(sha1B64)) return true;
+
+                // D. Hex(MD5) - 32자리
+                String md5Hex = HexFormat.of().formatHex(md5.digest(bytes));
+                if (target.equalsIgnoreCase(md5Hex)) return true;
+
+                // E. Hex(SHA-256) - 64자리
+                String sha256Hex = HexFormat.of().formatHex(sha256.digest(bytes));
+                if (target.equalsIgnoreCase(sha256Hex)) return true;
+            }
+        } catch (Exception e) {
+            log.warn("그룹웨어 비밀번호 매칭 계산 중 예외: {}", e.getMessage());
+        }
+
+        return false;
     }
 }

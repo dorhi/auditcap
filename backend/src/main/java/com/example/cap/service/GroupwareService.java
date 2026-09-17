@@ -33,14 +33,15 @@ public class GroupwareService {
         try (Connection conn = dataSource.getConnection()) {
             String sql = "SELECT MEMBERID, Passwd, MEMBERNAME, MEMBERNAME_KOR, MEMBERNAME_ENG, GROUPNAME, EMAIL, SAEA_CNAME " +
                          "FROM COOLWARE.dbo.CD_MEMBER_V_GW " +
-                         "WHERE MEMBERID = ?";
+                         "WHERE LTRIM(RTRIM(MEMBERID)) = ? OR UPPER(LTRIM(RTRIM(MEMBERID))) = UPPER(?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, searchId);
+                ps.setString(2, searchId);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         GroupwareUserDto dto = new GroupwareUserDto();
-                        dto.setMemberId(rs.getString("MEMBERID"));
-                        dto.setPasswd(rs.getString("Passwd"));
+                        dto.setMemberId(rs.getString("MEMBERID") != null ? rs.getString("MEMBERID").trim() : searchId);
+                        dto.setPasswd(rs.getString("Passwd") != null ? rs.getString("Passwd").trim() : "");
                         dto.setMemberName(rs.getString("MEMBERNAME"));
                         dto.setMemberNameKor(rs.getString("MEMBERNAME_KOR"));
                         dto.setMemberNameEng(rs.getString("MEMBERNAME_ENG"));
