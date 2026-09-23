@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { checkSessionOrRedirect } from '../utils/authUtils';
 
 const AccessLogManagement = () => {
   // 필터 상태
@@ -69,8 +70,10 @@ const AccessLogManagement = () => {
   }, [logType, status, keyword, startDate, endDate, page, size]);
 
   useEffect(() => {
-    fetchStats();
-    fetchLogs(0);
+    if (checkSessionOrRedirect()) {
+      fetchStats();
+      fetchLogs(0);
+    }
   }, []);
 
   // 검색 버튼 클릭

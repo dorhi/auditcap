@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import { checkSessionOrRedirect } from '../utils/authUtils';
 
 const ROLE_INFO = {
   SYSTEM_ADMIN: { label: '시스템 관리자', badgeColor: '#0077C8', desc: '시스템 및 권한 총괄' },
@@ -61,7 +62,9 @@ const RolePermissionManagement = ({ onPermissionChange }) => {
   };
 
   useEffect(() => {
-    fetchMatrix();
+    if (checkSessionOrRedirect()) {
+      fetchMatrix();
+    }
   }, []);
 
   // 메뉴 그룹핑 계산

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import { checkSessionOrRedirect } from '../utils/authUtils';
 
 const ICON_PRESETS = [
   '📊', '✏️', '🔍', '📋', '👤', '🖥️', '🔐', '📁', '📈', '💡',
@@ -65,7 +66,9 @@ const MenuManagement = ({ onMenuChange }) => {
   };
 
   useEffect(() => {
-    fetchMenus();
+    if (checkSessionOrRedirect()) {
+      fetchMenus();
+    }
   }, []);
 
   // 등록된 고유 그룹명 목록 추출

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthProvider';
+import { isTokenValid, checkSessionOrRedirect } from '../utils/authUtils';
 import axios from 'axios';
 import MenuManagement from './MenuManagement';
 import RolePermissionManagement from './RolePermissionManagement';
@@ -173,10 +174,28 @@ const editorStyles = {
 const Dashboard = () => {
   const { user, logout } = useAuth();
 
+  // 1. 대시보드 컴포넌트 마운트 시 세션 유효성 검사 (세션 없으면 즉시 로그인 이동)
+  useEffect(() => {
+    checkSessionOrRedirect('세션이 존재하지 않거나 만료되었습니다. 로그인 화면으로 이동합니다.');
+  }, []);
+
   // 동적 사용자 메뉴 목록 (백엔드 권한 기반)
   const [userMenus, setUserMenus] = useState([]);
   // 현재 활성화된 메뉴 탭 (코드 또는 번호)
   const [activeMenu, setActiveMenu] = useState('ACTION_PLAN_INPUT');
+
+  // 2. 각 화면(메뉴 탭) 전환 시마다 세션 유효성 강제 검사
+  useEffect(() => {
+    checkSessionOrRedirect('세션이 만료되었습니다. 로그인 화면으로 이동합니다.');
+  }, [activeMenu]);
+
+  // 3. 메뉴 클릭 시 세션 유효성 사전 검사 핸들러
+  const handleMenuClick = (menuCode) => {
+    if (!checkSessionOrRedirect('세션이 만료되었습니다. 로그인 화면으로 이동합니다.')) {
+      return;
+    }
+    setActiveMenu(menuCode);
+  };
 
   // 기본 아이콘 매핑 (이모지 제거, 격식 있는 엔터프라이즈 스타일)
   const DEFAULT_ICONS = {
@@ -2292,7 +2311,7 @@ const Dashboard = () => {
                       return (
                         <button
                           key={menu.id || menu.menuCode}
-                          onClick={() => setActiveMenu(menu.menuCode)}
+                          onClick={() => handleMenuClick(menu.menuCode)}
                           className="saea-sub-menu-item"
                           style={active ? styles.activeNavItem : styles.navItem}
                           title={menu.description || menu.menuName}

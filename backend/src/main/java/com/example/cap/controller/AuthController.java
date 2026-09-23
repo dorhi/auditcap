@@ -214,6 +214,26 @@ public class AuthController {
     }
 
     /**
+     * 현재 로그인 세션 상태 및 사용자 정보 검증 API
+     * 세션이 없거나 토큰이 유효하지 않으면 401 Unauthorized 반환
+     */
+    @GetMapping("/me")
+    public ResponseEntity<?> getMySession(@AuthenticationPrincipal CustomUserInfo userInfo) {
+        if (userInfo == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "NO_SESSION", "message", "세션이 존재하지 않거나 만료되었습니다."));
+        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("username", userInfo.getUsername());
+        response.put("role", userInfo.getRole());
+        response.put("corpId", userInfo.getCorpId());
+        response.put("deptName", userInfo.getDeptName());
+        response.put("name", userInfo.getName());
+        response.put("mfaCompleted", userInfo.isMfaCompleted());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * 감사팀(SYSTEM_ADMIN)용 계정 승인 API
      */
     @PostMapping("/approve/{username}")

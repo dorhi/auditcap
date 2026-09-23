@@ -1,6 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { checkSessionOrRedirect } from '../utils/authUtils';
 
 const CustomScreenView = ({ menu }) => {
+  useEffect(() => {
+    checkSessionOrRedirect();
+  }, []);
+
   if (!menu) {
     return (
       <div style={styles.emptyContainer}>
