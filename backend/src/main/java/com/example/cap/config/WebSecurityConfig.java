@@ -53,6 +53,14 @@ public class WebSecurityConfig {
                 // 그 외 모든 API 요청은 최종 2FA 인증(MFA 완료)을 요구
                 .anyRequest().authenticated()
             )
+            // 세션 없거나 미인증 시 401 Unauthorized 표준 JSON 응답 반환
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.getWriter().write("{\"error\": \"UNAUTHORIZED\", \"message\": \"인증 세션이 없거나 만료되었습니다.\"}");
+                })
+            )
             // JWT 필터 추가
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

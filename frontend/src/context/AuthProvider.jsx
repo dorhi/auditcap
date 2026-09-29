@@ -6,17 +6,22 @@ import { isTokenValid } from '../utils/authUtils';
 axios.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token') || localStorage.getItem('temp_token');
   
-  // 로그인/회원가입 등 퍼블릭 요청이 아닌데 토큰이 만료된 경우 사전 차단
+  // 로그인/회원가입 등 퍼블릭 요청 여부
   const isPublicUrl = config.url && (config.url.includes('/api/auth/login') || config.url.includes('/api/auth/signup') || config.url.includes('/api/manual/'));
-  if (token && !isPublicUrl && !isTokenValid(token)) {
-    console.warn('[세션 가드] API 요청 전 토큰 만료 감지됨. 세션을 초기화합니다.');
+  
+  // 퍼블릭 요청이 아닌데 토큰이 없거나 만료된 경우 사전 차단 및 로그인 페이지로 이동
+  if (!isPublicUrl && (!token || !isTokenValid(token))) {
+    console.warn('[세션 가드] 유효한 인증 토큰이 없습니다. 세션을 초기화하고 로그인 페이지로 이동합니다.');
     localStorage.clear();
     delete axios.defaults.headers.common['Authorization'];
-    if (window.location.pathname !== '/login') {
-      alert('세션이 만료되었습니다. 다시 로그인해 주세요.');
+    if (window.location.pathname !== '/login' && window.location.pathname !== '/mfa-verify') {
+      if (!window.__isRedirectingToLogin) {
+        window.__isRedirectingToLogin = true;
+        alert('세션이 존재하지 않거나 만료되었습니다. 로그인 화면으로 이동합니다.');
+      }
       window.location.href = '/login';
     }
-    return Promise.reject(new Error('세션이 만료되었습니다.'));
+    return Promise.reject(new Error('세션이 존재하지 않거나 만료되었습니다.'));
   }
 
   if (token) {
@@ -38,7 +43,10 @@ axios.interceptors.response.use(
       localStorage.clear();
       delete axios.defaults.headers.common['Authorization'];
       if (window.location.pathname !== '/login') {
-        alert('세션이 만료되었거나 로그인 정보가 유효하지 않습니다. 로그인 화면으로 이동합니다.');
+        if (!window.__isRedirectingToLogin) {
+          window.__isRedirectingToLogin = true;
+          alert('세션이 만료되었거나 로그인 정보가 유효하지 않습니다. 로그인 화면으로 이동합니다.');
+        }
         window.location.href = '/login';
       }
     }
@@ -89,6 +97,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('access_token', finalToken);
       localStorage.setItem('user_info', JSON.stringify(userInfo));
       
+      window.__isRedirectingToLogin = false;
       setAccessToken(finalToken);
       setUser(userInfo);
       
@@ -124,6 +133,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('access_token', finalToken);
       localStorage.setItem('user_info', JSON.stringify(userInfo));
 
+      window.__isRedirectingToLogin = false;
       setAccessToken(finalToken);
       setUser(userInfo);
 
@@ -157,13 +167,20 @@ export const AuthProvider = ({ children }) => {
   // 브라우저 복귀 시(focus) 및 주기적으로 세션 유효성 검사 (10초 주기)
   useEffect(() => {
     const verifyActiveSession = () => {
+      // 이미 로그인, 회원가입, MFA 인증 대기 화면에 있는 경우 건너뜀
+      if (
+        window.location.pathname === '/login' ||
+        window.location.pathname === '/signup' ||
+        window.location.pathname === '/mfa-verify'
+      ) {
+        return;
+      }
+
       const currentToken = localStorage.getItem('access_token');
-      // 로그인 화면이 아닌데 토큰이 없거나 만료되었으면 즉시 로그아웃 리다이렉트
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-        if (!currentToken || !isTokenValid(currentToken)) {
-          console.warn('[세션 가드] 활성 세션 없음 또는 만료 감지');
-          logout(true);
-        }
+      // 보호된 화면인데 토큰이 없거나 만료되었으면 즉시 로그아웃 리다이렉트
+      if (!currentToken || !isTokenValid(currentToken)) {
+        console.warn('[세션 가드] 활성 세션 없음 또는 만료 감지');
+        logout(true);
       }
     };
 
@@ -187,7 +204,8 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
 
     if (window.location.pathname !== '/login') {
-      if (showAlert) {
+      if (showAlert && !window.__isRedirectingToLogin) {
+        window.__isRedirectingToLogin = true;
         alert('세션이 만료되었거나 존재하지 않습니다. 로그인 화면으로 이동합니다.');
       }
       window.location.href = '/login';

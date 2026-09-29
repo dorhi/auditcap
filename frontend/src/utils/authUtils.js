@@ -43,7 +43,8 @@ export const checkSessionOrRedirect = (alertMessage = '세션이 만료되었거
     
     // 현재 로그인 화면이 아닐 때만 리다이렉트 및 알림
     if (window.location.pathname !== '/login') {
-      if (alertMessage) {
+      if (alertMessage && !window.__isRedirectingToLogin) {
+        window.__isRedirectingToLogin = true;
         alert(alertMessage);
       }
       window.location.href = '/login';

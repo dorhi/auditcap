@@ -37,7 +37,8 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
     private final PasswordEncoder passwordEncoder;
     private final com.example.cap.service.GroupwareService groupwareService;
 
-    public CustomAuthenticationProvider(DataSource dataSource, UserRepository userRepository, PasswordEncoder passwordEncoder, com.example.cap.service.GroupwareService groupwareService) {
+    public CustomAuthenticationProvider(DataSource dataSource, UserRepository userRepository,
+            PasswordEncoder passwordEncoder, com.example.cap.service.GroupwareService groupwareService) {
         this.dataSource = dataSource;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -65,15 +66,15 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
 
         try {
             com.example.cap.dto.GroupwareUserDto gwUser = groupwareService.findGroupwareUser(username);
-            boolean hasGwPw = (gwUser != null) && (
-                (gwUser.getPasswd() != null && !gwUser.getPasswd().trim().isEmpty()) ||
-                (gwUser.getGwLoginPwd() != null && !gwUser.getGwLoginPwd().trim().isEmpty())
-            );
+            boolean hasGwPw = (gwUser != null)
+                    && ((gwUser.getPasswd() != null && !gwUser.getPasswd().trim().isEmpty()) ||
+                            (gwUser.getGwLoginPwd() != null && !gwUser.getGwLoginPwd().trim().isEmpty()));
 
             if (gwUser != null && hasGwPw) {
                 isGroupwareEmployee = true; // 사내 그룹웨어에 등록된 사원임!
 
-                // 실제 사내 웹 그룹웨어 포털 비밀번호(ORG_EMPLOYEE.LOGIN_PWD) 또는 ERP 비밀번호(CD_MEMBER_V_GW.Passwd) 매칭 검증
+                // 실제 사내 웹 그룹웨어 포털 비밀번호(ORG_EMPLOYEE.LOGIN_PWD) 또는 ERP
+                // 비밀번호(CD_MEMBER_V_GW.Passwd) 매칭 검증
                 boolean matchWebGw = gwUser.getGwLoginPwd() != null && !gwUser.getGwLoginPwd().isEmpty()
                         && matchesGroupwarePassword(password, gwUser.getGwLoginPwd());
                 boolean matchErpGw = gwUser.getPasswd() != null && !gwUser.getPasswd().isEmpty()
@@ -94,7 +95,6 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
             log.warn("그룹웨어 인증 확인 중 오류: {}", gwEx.getMessage(), gwEx);
         }
 
-
         // 사내 그룹웨어에 등록된 임직원은 오직 실제 사내 비밀번호로만 로그인 가능 (임시번호/아이디동일/로컬비밀번호 우회 원천 차단)
         if (isGroupwareEmployee && !isGroupwareValid) {
             throw new BadCredentialsException("비밀번호가 일치하지 않습니다.");
@@ -107,10 +107,14 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
             systemUser = userRepository.findByUsername(username).orElse(null);
             if (systemUser != null) {
                 // 그룹웨어 최신 정보로 동기화 갱신
-                if (gwName != null && !gwName.isEmpty()) systemUser.setName(gwName);
-                if (gwCorpId != null && !gwCorpId.isEmpty()) systemUser.setCorpId(gwCorpId);
-                if (gwDeptName != null && !gwDeptName.isEmpty()) systemUser.setDeptName(gwDeptName);
-                if (gwEmail != null && !gwEmail.isEmpty()) systemUser.setEmail(gwEmail);
+                if (gwName != null && !gwName.isEmpty())
+                    systemUser.setName(gwName);
+                if (gwCorpId != null && !gwCorpId.isEmpty())
+                    systemUser.setCorpId(gwCorpId);
+                if (gwDeptName != null && !gwDeptName.isEmpty())
+                    systemUser.setDeptName(gwDeptName);
+                if (gwEmail != null && !gwEmail.isEmpty())
+                    systemUser.setEmail(gwEmail);
                 systemUser.setPassword(passwordEncoder.encode(password)); // 사내 비밀번호로 로컬 비밀번호도 동기화!
                 userRepository.save(systemUser);
             } else {
@@ -178,8 +182,7 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
         return new UsernamePasswordAuthenticationToken(
                 userInfo,
                 password,
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + systemUser.getRole().name()))
-        );
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + systemUser.getRole().name())));
     }
 
     @Override
@@ -187,12 +190,8 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
         return UsernamePasswordAuthenticationToken.class.isAssignableFrom(authentication);
     }
 
-    public static final String GW_AES_KEY = "sae-aX9f3LqT7mN1bRwZ6vY2jP0cKdHs";
-    public static final String GW_AES_IV = GW_AES_KEY.substring(0, 16);
-
     /**
-     * 그룹웨어 뷰(CD_MEMBER_V_GW)의 비밀번호 일치 여부 검증
-     * - 사내 표준(ERP_AES_Encrypt.aspx): AES-256-CBC (PKCS7 Padding)
+     * 그룹웨어 뷰(CD_MEMBER_V_GW)의 비밀번호 해시(MD5/SHA-256 Base64 등) 일치 여부 검증
      * - 레거시 쿨웨어 표준: MD5 해시 바이너리의 Base64 인코딩 (24자리)
      * - 신규 표준: SHA-256 해시 바이너리의 Base64 인코딩 (44자리)
      * - 문자셋: UTF-8, EUC-KR, MS949, ISO-8859-1 모두 지원
@@ -211,33 +210,12 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
             return true;
         }
 
-        // 2. [사내 공식 표준] AES-256-CBC 대조 (C# ERP_AES_Encrypt.aspx 호환)
-        try {
-            // A. 암호문 복호화 대조
-            String decrypted = decryptAes256(target);
-            if (decrypted != null && (rawPassword.equals(decrypted) || trimmedPassword.equals(decrypted))) {
-                return true;
-            }
-            // B. 입력값 암호화 대조
-            String encryptedRaw = encryptAes256(rawPassword);
-            if (encryptedRaw != null && target.equals(encryptedRaw)) {
-                return true;
-            }
-            String encryptedTrimmed = encryptAes256(trimmedPassword);
-            if (encryptedTrimmed != null && target.equals(encryptedTrimmed)) {
-                return true;
-            }
-        } catch (Exception e) {
-            log.warn("AES-256 대조 중 예외: {}", e.getMessage());
-        }
-
-        // 3. 레거시 해시(MD5/SHA) 대조
         try {
             Base64.Encoder b64 = Base64.getEncoder();
-            String[] charsets = {"UTF-8", "EUC-KR", "MS949", "UTF-16LE", "UTF-16BE", "ISO-8859-1"};
-            String[] pwVariants = rawPassword.equals(trimmedPassword) 
-                    ? new String[]{rawPassword} 
-                    : new String[]{rawPassword, trimmedPassword};
+            String[] charsets = { "UTF-8", "EUC-KR", "MS949", "UTF-16LE", "UTF-16BE", "ISO-8859-1" };
+            String[] pwVariants = rawPassword.equals(trimmedPassword)
+                    ? new String[] { rawPassword }
+                    : new String[] { rawPassword, trimmedPassword };
 
             for (String pw : pwVariants) {
                 for (String csName : charsets) {
@@ -248,32 +226,38 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
                     MessageDigest md5 = MessageDigest.getInstance("MD5");
                     byte[] md5Bytes = md5.digest(bytes);
                     String md5B64 = b64.encodeToString(md5Bytes);
-                    if (target.equals(md5B64)) return true;
+                    if (target.equals(md5B64))
+                        return true;
 
                     // B. Base64(SHA-256) - 44자리 (신규 표준)
                     MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
                     byte[] sha256Bytes = sha256.digest(bytes);
                     String sha256B64 = b64.encodeToString(sha256Bytes);
-                    if (target.equals(sha256B64)) return true;
+                    if (target.equals(sha256B64))
+                        return true;
 
                     // C. Base64(SHA-1) - 28자리
                     MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
                     byte[] sha1Bytes = sha1.digest(bytes);
                     String sha1B64 = b64.encodeToString(sha1Bytes);
-                    if (target.equals(sha1B64)) return true;
+                    if (target.equals(sha1B64))
+                        return true;
 
                     // D. Hex(MD5) - 32자리
                     String md5Hex = HexFormat.of().formatHex(md5Bytes);
-                    if (target.equalsIgnoreCase(md5Hex)) return true;
+                    if (target.equalsIgnoreCase(md5Hex))
+                        return true;
 
                     // E. Hex(SHA-256) - 64자리 (ORG_EMPLOYEE.LOGIN_PWD)
                     String sha256Hex = HexFormat.of().formatHex(sha256Bytes);
-                    if (target.equalsIgnoreCase(sha256Hex)) return true;
+                    if (target.equalsIgnoreCase(sha256Hex))
+                        return true;
 
                     // F. Hex(MD5) 문자열을 다시 MD5한 Base64
                     MessageDigest md5Second = MessageDigest.getInstance("MD5");
                     String md5HexB64 = b64.encodeToString(md5Second.digest(md5Hex.getBytes(cs)));
-                    if (target.equals(md5HexB64)) return true;
+                    if (target.equals(md5HexB64))
+                        return true;
                 }
             }
         } catch (Exception e) {
@@ -283,38 +267,9 @@ public class CustomAuthenticationProvider implements AuthenticationProvider {
         return false;
     }
 
-    /**
-     * 사내 그룹웨어/ERP AES256 CBC PKCS7 암호화 (C# ERP_AES_Encrypt 호환)
-     */
-    public static String encryptAes256(String plainText) {
-        if (plainText == null) plainText = "";
-        try {
-            SecretKeySpec keySpec = new SecretKeySpec(GW_AES_KEY.getBytes(StandardCharsets.UTF_8), "AES");
-            IvParameterSpec ivSpec = new IvParameterSpec(GW_AES_IV.getBytes(StandardCharsets.UTF_8));
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec);
-            byte[] encrypted = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(encrypted);
-        } catch (Exception e) {
-            log.warn("사내 그룹웨어 AES 암호화 실패: {}", e.getMessage());
-            return null;
-        }
-    }
+    
+    
 
-    /**
-     * 사내 그룹웨어/ERP AES256 CBC PKCS7 복호화 (C# ERP_AES_Encrypt 호환)
-     */
-    public static String decryptAes256(String cipherText) {
-        if (cipherText == null || cipherText.trim().isEmpty()) return null;
-        try {
-            SecretKeySpec keySpec = new SecretKeySpec(GW_AES_KEY.getBytes(StandardCharsets.UTF_8), "AES");
-            IvParameterSpec ivSpec = new IvParameterSpec(GW_AES_IV.getBytes(StandardCharsets.UTF_8));
-            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-            cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec);
-            byte[] decrypted = cipher.doFinal(Base64.getDecoder().decode(cipherText.trim()));
-            return new String(decrypted, StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-}
+    
+
+
