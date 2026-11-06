@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthProvider';
+import { useLanguage } from '../context/LanguageContext';
 import SaeALogo from './common/SaeALogo';
+import LanguageToggle from './common/LanguageToggle';
 
 const Login = () => {
   const { login } = useAuth();
+  const { t, isEn } = useLanguage();
   const [error, setError] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -30,6 +33,11 @@ const Login = () => {
       <div style={styles.brandAccentBar} />
 
       <div style={styles.card}>
+        {/* 상단 다국어 선택 바 (KOR / ENG) */}
+        <div style={styles.langHeaderBar}>
+          <LanguageToggle variant="light" size="small" />
+        </div>
+
         {/* 글로벌세아 공식 로고 (0.5X 보호공간 준수) */}
         <div style={styles.logoWrapper}>
           <SaeALogo 
@@ -40,8 +48,8 @@ const Login = () => {
         </div>
 
         <div style={styles.headerTextBox}>
-          <h2 style={styles.title}>시스템 로그인</h2>
-          <p style={styles.subtitle}>감사 지적사항 및 개선조치(CAP) 통합 관리 포털</p>
+          <h2 style={styles.title}>{t('loginTitle', '시스템 로그인')}</h2>
+          <p style={styles.subtitle}>{t('loginSubtitle', '감사 지적사항 및 개선조치(CAP) 통합 관리 포털')}</p>
         </div>
         
         {error && (
@@ -53,10 +61,10 @@ const Login = () => {
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.inputGroup}>
-            <label style={styles.label}>ID (아이디)</label>
+            <label style={styles.label}>{t('idLabel', 'ID (아이디)')}</label>
             <input 
               type="text" 
-              placeholder="사내 ID를 입력하세요"
+              placeholder={t('idPlaceholder', '사내 ID를 입력하세요')}
               value={username} 
               onChange={(e) => setUsername(e.target.value)} 
               required 
@@ -66,10 +74,10 @@ const Login = () => {
           </div>
           
           <div style={styles.inputGroup}>
-            <label style={styles.label}>비밀번호</label>
+            <label style={styles.label}>{t('pwLabel', '비밀번호')}</label>
             <input 
               type="password" 
-              placeholder="비밀번호를 입력하세요"
+              placeholder={t('pwPlaceholder', '비밀번호를 입력하세요')}
               value={password} 
               onChange={(e) => setPassword(e.target.value)} 
               required 
@@ -83,16 +91,16 @@ const Login = () => {
             disabled={isSubmitting}
             style={styles.button}
           >
-            {isSubmitting ? '로그인 확인 중...' : '로그인'}
+            {isSubmitting ? t('loginChecking', '로그인 확인 중...') : t('loginBtn', '로그인')}
           </button>
         </form>
 
         <div style={styles.footerNote}>
-          신규 계정 발급 및 권한 문의는 <strong>감사팀 및 시스템 관리자</strong>에게 연락해 주세요.
+          {t('loginFooter', '신규 계정 발급 및 권한 문의는 감사팀 및 시스템 관리자에게 연락해 주세요.')}
         </div>
 
         <div style={styles.copyright}>
-          © GLOBAL SAE-A GROUP. All Rights Reserved.
+          {t('copyright', '© GLOBAL SAE-A GROUP. All Rights Reserved.')}
         </div>
       </div>
     </div>
@@ -122,11 +130,17 @@ const styles = {
   card: {
     width: '100%',
     maxWidth: '420px',
-    padding: '40px 36px 30px',
+    padding: '30px 36px 30px',
     backgroundColor: '#ffffff',
     borderRadius: '12px',
     boxShadow: '0 10px 25px -5px rgba(0, 119, 200, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
     border: '1px solid #e2e8f0',
+    position: 'relative',
+  },
+  langHeaderBar: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: '10px',
   },
   logoWrapper: {
     display: 'flex',

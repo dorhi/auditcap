@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthProvider';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { isTokenValid } from './utils/authUtils';
 import Login from './components/Login';
 import MfaVerify from './components/MfaVerify';
@@ -36,9 +37,10 @@ const MfaRoute = ({ children }) => {
 // 세션이 없거나 만료되었으면 무조건 로그인 화면으로 이동
 const ProtectedRoute = ({ children }) => {
   const { accessToken, tempToken, loading } = useAuth();
+  const { isEn } = useLanguage();
 
   if (loading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>로딩 중...</div>;
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>{isEn ? 'Loading...' : '로딩 중...'}</div>;
   }
   
   if (!accessToken || !isTokenValid(accessToken)) {
@@ -84,9 +86,11 @@ function AppRoutes() {
 function App() {
   return (
     <Router>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </LanguageProvider>
     </Router>
   );
 }

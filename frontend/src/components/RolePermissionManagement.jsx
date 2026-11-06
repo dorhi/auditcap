@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import { useLanguage } from '../context/LanguageContext';
 import { checkSessionOrRedirect } from '../utils/authUtils';
 
 const ROLE_INFO = {
@@ -33,6 +34,7 @@ const getMenuIcon = (menu) => {
 };
 
 const RolePermissionManagement = ({ onPermissionChange }) => {
+  const { isEn, getRoleName, getMenuName, getGroupName } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -182,14 +184,20 @@ const RolePermissionManagement = ({ onPermissionChange }) => {
       <div style={styles.card}>
         <div style={styles.cardHeader}>
           <div>
-            <h3 style={styles.cardTitle}>역할(권한)별 화면 접근 관리</h3>
+            <h3 style={styles.cardTitle}>
+              {isEn ? 'Role-based Screen Access Admin' : '역할(권한)별 화면 접근 관리'}
+            </h3>
             <p style={styles.cardSubtitle}>
-              각 사용자 역할(Role)별로 접근 가능한 시스템 화면(메뉴)을 매트릭스로 제어합니다. 체크된 화면만 해당 역할의 사용자에게 노출되고 접근이 허용됩니다.
+              {isEn 
+                ? 'Configure accessibility to screens/menus for each user role via permission matrix.' 
+                : '각 사용자 역할(Role)별로 접근 가능한 시스템 화면(메뉴)을 매트릭스로 제어합니다. 체크된 화면만 해당 역할의 사용자에게 노출되고 접근이 허용됩니다.'}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             {isDirty && (
-              <span style={styles.dirtyBadge}>● 저장되지 않은 변경사항이 있습니다</span>
+              <span style={styles.dirtyBadge}>
+                {isEn ? '● Unsaved changes pending' : '● 저장되지 않은 변경사항이 있습니다'}
+              </span>
             )}
             <button
               onClick={handleSave}
@@ -200,7 +208,7 @@ const RolePermissionManagement = ({ onPermissionChange }) => {
                 cursor: (!isDirty || saving) ? 'not-allowed' : 'pointer',
               }}
             >
-              {saving ? '저장 중...' : '💾 권한 설정 저장'}
+              {saving ? (isEn ? 'Saving...' : '저장 중...') : (isEn ? '💾 Save Permissions' : '💾 권한 설정 저장')}
             </button>
           </div>
         </div>
@@ -213,32 +221,32 @@ const RolePermissionManagement = ({ onPermissionChange }) => {
               <div key={role} style={styles.roleCard}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ ...styles.roleBadge, backgroundColor: info.badgeColor }}>
-                    {info.label}
+                    {getRoleName(role) || info.label}
                   </span>
                   <span style={styles.roleCode}>{role}</span>
                 </div>
-                <span style={styles.roleDesc}>{info.desc}</span>
+                <span style={styles.roleDesc}>{isEn ? role : info.desc}</span>
               </div>
             );
           })}
         </div>
 
         {loading ? (
-          <div style={styles.loadingArea}>권한 매트릭스를 불러오는 중입니다...</div>
+          <div style={styles.loadingArea}>{isEn ? 'Loading permission matrix...' : '권한 매트릭스를 불러오는 중입니다...'}</div>
         ) : (
           <div style={styles.tableWrapper}>
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ ...styles.th, width: '220px', minWidth: '220px' }}>화면 / 메뉴</th>
-                  <th style={{ ...styles.th, width: '100px', textAlign: 'center' }}>일괄 제어</th>
+                  <th style={{ ...styles.th, width: '220px', minWidth: '220px' }}>{isEn ? 'Screen / Menu' : '화면 / 메뉴'}</th>
+                  <th style={{ ...styles.th, width: '100px', textAlign: 'center' }}>{isEn ? 'Batch' : '일괄 제어'}</th>
                   {roles.map(role => {
                     const info = ROLE_INFO[role] || { label: role, badgeColor: '#4f46e5' };
                     return (
                       <th key={role} style={{ ...styles.thRole, minWidth: '130px', textAlign: 'center' }}>
                         <div style={styles.roleHeaderContainer}>
                           <span style={{ ...styles.roleHeaderBadge, backgroundColor: info.badgeColor }}>
-                            {info.label}
+                            {getRoleName(role) || info.label}
                           </span>
                           <span style={styles.roleHeaderCode}>{role}</span>
                           <div style={styles.columnBulkBtns}>
@@ -246,17 +254,17 @@ const RolePermissionManagement = ({ onPermissionChange }) => {
                               type="button"
                               onClick={() => handleSelectAllForRole(role, true)}
                               style={styles.bulkBtn}
-                              title="이 역할에 모든 화면 허용"
+                              title={isEn ? 'Allow all screens for this role' : '이 역할에 모든 화면 허용'}
                             >
-                              전체선택
+                              {isEn ? 'All' : '전체선택'}
                             </button>
                             <button
                               type="button"
                               onClick={() => handleSelectAllForRole(role, false)}
                               style={styles.bulkBtn}
-                              title="이 역할의 모든 화면 해제"
+                              title={isEn ? 'Clear all screens for this role' : '이 역할의 모든 화면 해제'}
                             >
-                              전체해제
+                              {isEn ? 'Clear' : '전체해제'}
                             </button>
                           </div>
                         </div>
@@ -310,10 +318,10 @@ const RolePermissionManagement = ({ onPermissionChange }) => {
                           <td style={styles.tdMenu}>
                             <div style={styles.menuCell}>
                               <div>
-                                <div style={styles.menuName}>{menu.menuName}</div>
+                                <div style={styles.menuName}>{getMenuName(menu.menuCode, menu.menuName)}</div>
                                 <span style={styles.menuCodeBadge}>{menu.menuCode}</span>
                                 {!menu.enabled && (
-                                  <span style={styles.disabledBadge}>비활성</span>
+                                  <span style={styles.disabledBadge}>{isEn ? 'Disabled' : '비활성'}</span>
                                 )}
                               </div>
                             </div>
@@ -326,17 +334,17 @@ const RolePermissionManagement = ({ onPermissionChange }) => {
                                 type="button"
                                 onClick={() => handleSelectAllForMenu(menu.menuCode, true)}
                                 style={styles.rowBulkBtn}
-                                title="모든 역할에 권한 허용"
+                                title={isEn ? "Allow all roles" : "모든 역할에 권한 허용"}
                               >
-                                전체
+                                {isEn ? 'All' : '전체'}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleSelectAllForMenu(menu.menuCode, false)}
                                 style={styles.rowBulkBtn}
-                                title="모든 역할의 권한 해제"
+                                title={isEn ? "Revoke all roles" : "모든 역할의 권한 해제"}
                               >
-                                해제
+                                {isEn ? 'Clear' : '해제'}
                               </button>
                             </div>
                           </td>
@@ -365,7 +373,7 @@ const RolePermissionManagement = ({ onPermissionChange }) => {
                                     fontWeight: '600',
                                     color: hasAccess ? '#166534' : '#9ca3af',
                                   }}>
-                                    {hasAccess ? '접근 허용' : '접근 불가'}
+                                    {hasAccess ? (isEn ? 'Allowed' : '접근 허용') : (isEn ? 'Blocked' : '접근 불가')}
                                   </span>
                                 </div>
                               </td>
@@ -384,7 +392,11 @@ const RolePermissionManagement = ({ onPermissionChange }) => {
         {/* 하단 푸터 저장 안내 */}
         <div style={styles.cardFooter}>
           <p style={styles.footerNotice}>
-            💡 <b>팁:</b> 권한 설정을 변경한 후 우측 상단의 <b>[💾 권한 설정 저장]</b> 버튼을 눌러야 실제 시스템에 즉시 반영됩니다.
+            {isEn ? (
+              <>💡 <b>Tip:</b> Changes take effect immediately after clicking the <b>[💾 Save Permissions]</b> button in the top right.</>
+            ) : (
+              <>💡 <b>팁:</b> 권한 설정을 변경한 후 우측 상단의 <b>[💾 권한 설정 저장]</b> 버튼을 눌러야 실제 시스템에 즉시 반영됩니다.</>
+            )}
           </p>
         </div>
       </div>

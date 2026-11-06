@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import { useLanguage } from '../context/LanguageContext';
 import { checkSessionOrRedirect } from '../utils/authUtils';
 
 const ICON_PRESETS = [
@@ -26,6 +27,7 @@ const getMenuIcon = (menu) => {
 };
 
 const MenuManagement = ({ onMenuChange }) => {
+  const { isEn, getGroupName, getMenuName } = useLanguage();
   const [menus, setMenus] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -236,25 +238,29 @@ const MenuManagement = ({ onMenuChange }) => {
       <div style={styles.card}>
         <div style={styles.cardHeader}>
           <div>
-            <h3 style={styles.cardTitle}>시스템 화면 및 메뉴 그룹 관리</h3>
+            <h3 style={styles.cardTitle}>
+              {isEn ? 'System Screen & Menu Group Admin' : '시스템 화면 및 메뉴 그룹 관리'}
+            </h3>
             <p style={styles.cardSubtitle}>
-              메뉴를 그룹(대메뉴)별로 분류하고, 관리자가 각 화면의 이름, 소속 그룹, 표시 순서를 자유롭게 편집합니다.
+              {isEn 
+                ? 'Classify screens by menu group and configure display names, sort order, and permissions.' 
+                : '메뉴를 그룹(대메뉴)별로 분류하고, 관리자가 각 화면의 이름, 소속 그룹, 표시 순서를 자유롭게 편집합니다.'}
             </p>
           </div>
           <button onClick={openCreateModal} style={styles.createBtn}>
-            새 화면 / 메뉴 추가
+            {isEn ? '+ Add New Screen/Menu' : '새 화면 / 메뉴 추가'}
           </button>
         </div>
 
         {/* 그룹 필터 탭 */}
         <div style={styles.filterBar}>
-          <span style={styles.filterLabel}>그룹 필터:</span>
+          <span style={styles.filterLabel}>{isEn ? 'Group Filter:' : '그룹 필터:'}</span>
           <button
             type="button"
             onClick={() => setSelectedGroupFilter('ALL')}
             style={selectedGroupFilter === 'ALL' ? styles.filterBtnActive : styles.filterBtn}
           >
-            전체 보기 ({menus.length})
+            {isEn ? `All (${menus.length})` : `전체 보기 (${menus.length})`}
           </button>
           {existingGroups.map(g => {
             const count = menus.filter(m => m.groupName === g).length;
@@ -265,28 +271,28 @@ const MenuManagement = ({ onMenuChange }) => {
                 onClick={() => setSelectedGroupFilter(g)}
                 style={selectedGroupFilter === g ? styles.filterBtnActive : styles.filterBtn}
               >
-                {g} ({count})
+                {getGroupName(g)} ({count})
               </button>
             );
           })}
         </div>
 
         {loading ? (
-          <div style={styles.loadingArea}>메뉴 목록을 불러오는 중입니다...</div>
+          <div style={styles.loadingArea}>{isEn ? 'Loading menus...' : '메뉴 목록을 불러오는 중입니다...'}</div>
         ) : (
           <div style={styles.tableWrapper}>
             <table style={styles.table}>
               <thead>
                 <tr>
-                  <th style={{ ...styles.th, width: '70px', textAlign: 'center' }}>순서</th>
-                  <th style={{ ...styles.th, width: '150px' }}>소속 그룹</th>
-                  <th style={{ ...styles.th, width: '180px' }}>메뉴 코드</th>
-                  <th style={{ ...styles.th, width: '240px' }}>화면 / 메뉴명 (클릭하여 수정)</th>
-                  <th style={{ ...styles.th, width: '110px' }}>화면 유형</th>
-                  <th style={{ ...styles.th, width: '130px' }}>경로 (URL)</th>
-                  <th style={styles.th}>설명</th>
-                  <th style={{ ...styles.th, width: '85px', textAlign: 'center' }}>사용 여부</th>
-                  <th style={{ ...styles.th, width: '130px', textAlign: 'center' }}>관리</th>
+                  <th style={{ ...styles.th, width: '70px', textAlign: 'center' }}>{isEn ? 'Order' : '순서'}</th>
+                  <th style={{ ...styles.th, width: '150px' }}>{isEn ? 'Group' : '소속 그룹'}</th>
+                  <th style={{ ...styles.th, width: '180px' }}>{isEn ? 'Menu Code' : '메뉴 코드'}</th>
+                  <th style={{ ...styles.th, width: '240px' }}>{isEn ? 'Menu Name (Click to edit)' : '화면 / 메뉴명 (클릭하여 수정)'}</th>
+                  <th style={{ ...styles.th, width: '110px' }}>{isEn ? 'Screen Type' : '화면 유형'}</th>
+                  <th style={{ ...styles.th, width: '130px' }}>{isEn ? 'Path (URL)' : '경로 (URL)'}</th>
+                  <th style={styles.th}>{isEn ? 'Description' : '설명'}</th>
+                  <th style={{ ...styles.th, width: '85px', textAlign: 'center' }}>{isEn ? 'Enabled' : '사용 여부'}</th>
+                  <th style={{ ...styles.th, width: '130px', textAlign: 'center' }}>{isEn ? 'Actions' : '관리'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -440,7 +446,9 @@ const MenuManagement = ({ onMenuChange }) => {
           <div style={styles.modalContent}>
             <div style={styles.modalHeader}>
               <h3 style={styles.modalTitle}>
-                {modalMode === 'CREATE' ? '신규 화면 / 메뉴 등록' : '화면 정보 및 이름/순서 수정'}
+                {modalMode === 'CREATE' 
+                  ? (isEn ? 'Register New Screen / Menu' : '신규 화면 / 메뉴 등록') 
+                  : (isEn ? 'Edit Screen Info & Order' : '화면 정보 및 이름/순서 수정')}
               </h3>
               <button onClick={closeModal} style={styles.closeBtn}>×</button>
             </div>
@@ -450,42 +458,44 @@ const MenuManagement = ({ onMenuChange }) => {
                 {/* 메뉴 코드 */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
-                    메뉴 식별 코드 <span style={styles.required}>*</span>
+                    {isEn ? 'Menu Identifier Code' : '메뉴 식별 코드'} <span style={styles.required}>*</span>
                   </label>
                   <input
                     type="text"
                     required
                     disabled={modalMode === 'EDIT'}
-                    placeholder="예: CUSTOM_AUDIT_GUIDE"
+                    placeholder={isEn ? 'e.g. CUSTOM_AUDIT_GUIDE' : '예: CUSTOM_AUDIT_GUIDE'}
                     value={formData.menuCode}
                     onChange={(e) => handleFormChange('menuCode', e.target.value.toUpperCase())}
                     style={modalMode === 'EDIT' ? styles.inputDisabled : styles.input}
                   />
                   <span style={styles.hint}>
-                    {modalMode === 'CREATE' ? '영문 대문자 및 언더바(_) 권장' : '메뉴 코드는 고유 식별자이므로 변경 불가'}
+                    {modalMode === 'CREATE' 
+                      ? (isEn ? 'Uppercase letters & underscore (_) recommended' : '영문 대문자 및 언더바(_) 권장') 
+                      : (isEn ? 'Menu code cannot be changed (Identifier)' : '메뉴 코드는 고유 식별자이므로 변경 불가')}
                   </span>
                 </div>
 
                 {/* 화면 이름 (수정 핵심) */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
-                    화면 / 메뉴 이름 <span style={styles.required}>*</span>
+                    {isEn ? 'Screen / Menu Name' : '화면 / 메뉴 이름'} <span style={styles.required}>*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="예: 감사 업무 가이드라인"
+                    placeholder={isEn ? 'e.g. Audit Guidelines' : '예: 감사 업무 가이드라인'}
                     value={formData.menuName}
                     onChange={(e) => handleFormChange('menuName', e.target.value)}
                     style={{ ...styles.input, fontWeight: '600', borderColor: '#4f46e5' }}
                   />
-                  <span style={styles.hint}>사이드바 및 화면 상단에 표시될 화면 이름</span>
+                  <span style={styles.hint}>{isEn ? 'Menu title displayed on sidebar and top header' : '사이드바 및 화면 상단에 표시될 화면 이름'}</span>
                 </div>
 
                 {/* 소속 메뉴 그룹 */}
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
-                    소속 메뉴 그룹 <span style={styles.required}>*</span>
+                    {isEn ? 'Menu Group' : '소속 메뉴 그룹'} <span style={styles.required}>*</span>
                   </label>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <select
@@ -494,30 +504,30 @@ const MenuManagement = ({ onMenuChange }) => {
                       style={{ ...styles.select, flex: 1 }}
                     >
                       {existingGroups.map(g => (
-                        <option key={g} value={g}>{g}</option>
+                        <option key={g} value={g}>{getGroupName(g)}</option>
                       ))}
-                      <option value="__NEW__">[직접 입력] 새 그룹명 입력...</option>
+                      <option value="__NEW__">{isEn ? '[Manual] Enter new group...' : '[직접 입력] 새 그룹명 입력...'}</option>
                     </select>
                   </div>
                   {formData.groupName === '__NEW__' || !existingGroups.includes(formData.groupName) ? (
                     <input
                       type="text"
-                      placeholder="신규 그룹명 입력 (예: 경영 보고 관리)"
+                      placeholder={isEn ? 'Enter new group name (e.g. Executive Reports)' : '신규 그룹명 입력 (예: 경영 보고 관리)'}
                       value={formData.groupName === '__NEW__' ? '' : formData.groupName}
                       onChange={(e) => handleFormChange('groupName', e.target.value)}
                       style={{ ...styles.input, marginTop: '6px' }}
                       autoFocus
                     />
                   ) : null}
-                  <span style={styles.hint}>사이드바에서 메뉴를 묶어서 표시할 대분류 그룹</span>
+                  <span style={styles.hint}>{isEn ? 'Parent group category for sidebar grouping' : '사이드바에서 메뉴를 묶어서 표시할 대분류 그룹'}</span>
                 </div>
 
                 {/* 그룹 순서 & 화면 순서 */}
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>표시 순서 (그룹 순서 / 화면 순서)</label>
+                  <label style={styles.label}>{isEn ? 'Display Order (Group Order / Screen Order)' : '표시 순서 (그룹 순서 / 화면 순서)'}</label>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: '11px', color: '#6b7280' }}>그룹 순서:</span>
+                      <span style={{ fontSize: '11px', color: '#6b7280' }}>{isEn ? 'Group Order:' : '그룹 순서:'}</span>
                       <input
                         type="number"
                         min="1"
@@ -527,7 +537,7 @@ const MenuManagement = ({ onMenuChange }) => {
                       />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: '11px', color: '#6b7280' }}>화면 순서:</span>
+                      <span style={{ fontSize: '11px', color: '#6b7280' }}>{isEn ? 'Screen Order:' : '화면 순서:'}</span>
                       <input
                         type="number"
                         min="1"
@@ -541,24 +551,24 @@ const MenuManagement = ({ onMenuChange }) => {
 
                 {/* 화면 유형 */}
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>화면 유형</label>
+                  <label style={styles.label}>{isEn ? 'Screen Type' : '화면 유형'}</label>
                   <select
                     value={formData.screenType}
                     onChange={(e) => handleFormChange('screenType', e.target.value)}
                     style={styles.select}
                   >
-                    <option value="INTERNAL">내장 기능 화면 (시스템 기본 탭 연동)</option>
-                    <option value="CUSTOM_HTML">커스텀 화면 (HTML/서식 안내 페이지)</option>
-                    <option value="EXTERNAL_URL">외부 웹 링크 (외부 URL 임베드/링크)</option>
+                    <option value="INTERNAL">{isEn ? 'Built-in Screen (System Tab)' : '내장 기능 화면 (시스템 기본 탭 연동)'}</option>
+                    <option value="CUSTOM_HTML">{isEn ? 'Custom Screen (HTML / Guidelines)' : '커스텀 화면 (HTML/서식 안내 페이지)'}</option>
+                    <option value="EXTERNAL_URL">{isEn ? 'External Web Link (URL Embed)' : '외부 웹 링크 (외부 URL 임베드/링크)'}</option>
                   </select>
                 </div>
 
                 {/* 경로 */}
                 <div style={{ ...styles.formGroup, gridColumn: 'span 2' }}>
-                  <label style={styles.label}>경로 (URL 또는 라우트)</label>
+                  <label style={styles.label}>{isEn ? 'Path (URL or Route)' : '경로 (URL 또는 라우트)'}</label>
                   <input
                     type="text"
-                    placeholder="예: /guidelines 또는 https://example.com"
+                    placeholder={isEn ? 'e.g. /guidelines or https://example.com' : '예: /guidelines 또는 https://example.com'}
                     value={formData.menuPath}
                     onChange={(e) => handleFormChange('menuPath', e.target.value)}
                     style={styles.input}
@@ -568,10 +578,10 @@ const MenuManagement = ({ onMenuChange }) => {
 
               {/* 화면 설명 */}
               <div style={{ ...styles.formGroup, marginTop: '12px' }}>
-                <label style={styles.label}>화면 설명</label>
+                <label style={styles.label}>{isEn ? 'Description' : '화면 설명'}</label>
                 <input
                   type="text"
-                  placeholder="화면의 용도 및 간단한 설명을 입력하세요"
+                  placeholder={isEn ? 'Enter purpose and brief description of the screen' : '화면의 용도 및 간단한 설명을 입력하세요'}
                   value={formData.description}
                   onChange={(e) => handleFormChange('description', e.target.value)}
                   style={styles.input}
@@ -582,7 +592,9 @@ const MenuManagement = ({ onMenuChange }) => {
               {formData.screenType !== 'INTERNAL' && (
                 <div style={{ ...styles.formGroup, marginTop: '12px' }}>
                   <label style={styles.label}>
-                    {formData.screenType === 'EXTERNAL_URL' ? '연결할 외부 URL' : '화면 상세 콘텐츠 (HTML/텍스트)'}
+                    {formData.screenType === 'EXTERNAL_URL' 
+                      ? (isEn ? 'External Target URL' : '연결할 외부 URL') 
+                      : (isEn ? 'Screen Custom Content (HTML/Text)' : '화면 상세 콘텐츠 (HTML/텍스트)')}
                   </label>
                   {formData.screenType === 'EXTERNAL_URL' ? (
                     <input
@@ -595,7 +607,9 @@ const MenuManagement = ({ onMenuChange }) => {
                   ) : (
                     <textarea
                       rows="8"
-                      placeholder="HTML 태그 또는 서식 텍스트를 입력해 화면을 구성할 수 있습니다. (예: <h3>공지</h3><p>내용</p>)"
+                      placeholder={isEn 
+                        ? 'Enter HTML tags or text to build the screen (e.g. <h3>Notice</h3><p>Details</p>)' 
+                        : 'HTML 태그 또는 서식 텍스트를 입력해 화면을 구성할 수 있습니다. (예: <h3>공지</h3><p>내용</p>)'}
                       value={formData.customContent}
                       onChange={(e) => handleFormChange('customContent', e.target.value)}
                       style={styles.textarea}
@@ -614,17 +628,17 @@ const MenuManagement = ({ onMenuChange }) => {
                   style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                 />
                 <label htmlFor="enabledCheck" style={{ fontSize: '13px', color: '#374151', cursor: 'pointer' }}>
-                  시스템 메뉴에 활성화(표시)합니다.
+                  {isEn ? 'Activate (display) in system menu.' : '시스템 메뉴에 활성화(표시)합니다.'}
                 </label>
               </div>
 
               {/* 모달 푸터 버튼 */}
               <div style={styles.modalFooter}>
                 <button type="button" onClick={closeModal} style={styles.cancelBtn}>
-                  취소
+                  {isEn ? 'Cancel' : '취소'}
                 </button>
                 <button type="submit" style={styles.submitBtn}>
-                  {modalMode === 'CREATE' ? '등록 완료' : '변경사항 저장'}
+                  {modalMode === 'CREATE' ? (isEn ? 'Register' : '등록 완료') : (isEn ? 'Save Changes' : '변경사항 저장')}
                 </button>
               </div>
             </form>

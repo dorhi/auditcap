@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { useLanguage } from '../context/LanguageContext';
 import { checkSessionOrRedirect } from '../utils/authUtils';
 
 const AccessLogManagement = () => {
+  const { isEn, getMenuName } = useLanguage();
   // 필터 상태
   const [logType, setLogType] = useState('ALL'); // ALL, LOGIN, PAGE_ACCESS
   const [status, setStatus] = useState('ALL'); // ALL, SUCCESS, FAILED
@@ -118,10 +120,12 @@ const AccessLogManagement = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '20px', color: '#0f172a', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>📋</span> 시스템 접속 및 사용 감사 로그
+            <span>📋</span> {isEn ? 'System Access & Audit Logs' : '시스템 접속 및 사용 감사 로그'}
           </h3>
           <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
-            사용자 로그인 성공/실패 내역, 실패 원인, 메뉴별 화면 접속 이력을 실시간 모니터링하고 추적합니다.
+            {isEn 
+              ? 'Real-time monitoring and tracking of user logins, failures, and screen access logs.' 
+              : '사용자 로그인 성공/실패 내역, 실패 원인, 메뉴별 화면 접속 이력을 실시간 모니터링하고 추적합니다.'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -142,7 +146,7 @@ const AccessLogManagement = () => {
               gap: '6px'
             }}
           >
-            🔄 새로고침
+            {isEn ? '🔄 Refresh' : '🔄 새로고침'}
           </button>
           <button
             type="button"
@@ -162,7 +166,7 @@ const AccessLogManagement = () => {
               boxShadow: '0 2px 4px rgba(5, 150, 105, 0.2)'
             }}
           >
-            📥 엑셀(CSV) 다운로드
+            {isEn ? '📥 Export CSV' : '📥 엑셀(CSV) 다운로드'}
           </button>
         </div>
       </div>
@@ -268,7 +272,9 @@ const AccessLogManagement = () => {
         <form onSubmit={handleSearch} style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'flex-end' }}>
           {/* 로그 유형 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>로그 유형</label>
+            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>
+              {isEn ? 'Log Type' : '로그 유형'}
+            </label>
             <select
               value={logType}
               onChange={(e) => setLogType(e.target.value)}
@@ -281,15 +287,17 @@ const AccessLogManagement = () => {
                 minWidth: '130px'
               }}
             >
-              <option value="ALL">전체 유형</option>
-              <option value="LOGIN">로그인 이력 (LOGIN)</option>
-              <option value="PAGE_ACCESS">화면 접속 (PAGE_ACCESS)</option>
+              <option value="ALL">{isEn ? 'All Types' : '전체 유형'}</option>
+              <option value="LOGIN">{isEn ? 'Login History (LOGIN)' : '로그인 이력 (LOGIN)'}</option>
+              <option value="PAGE_ACCESS">{isEn ? 'Screen Access (PAGE_ACCESS)' : '화면 접속 (PAGE_ACCESS)'}</option>
             </select>
           </div>
 
           {/* 성공/실패 상태 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>처리 상태</label>
+            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>
+              {isEn ? 'Status' : '처리 상태'}
+            </label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
@@ -302,37 +310,39 @@ const AccessLogManagement = () => {
                 minWidth: '120px'
               }}
             >
-              <option value="ALL">전체 상태</option>
-              <option value="SUCCESS">성공 (SUCCESS)</option>
-              <option value="FAILED">실패 (FAILED)</option>
+              <option value="ALL">{isEn ? 'All Status' : '전체 상태'}</option>
+              <option value="SUCCESS">{isEn ? 'Success (SUCCESS)' : '성공 (SUCCESS)'}</option>
+              <option value="FAILED">{isEn ? 'Failed (FAILED)' : '실패 (FAILED)'}</option>
             </select>
           </div>
 
           {/* 기간 필터 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>발생 기간</label>
+              <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>
+                {isEn ? 'Date Range' : '발생 기간'}
+              </label>
               <div style={{ display: 'flex', gap: '4px' }}>
                 <button
                   type="button"
                   onClick={() => handleQuickPeriod(0)}
                   style={{ fontSize: '11px', padding: '1px 6px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '3px', cursor: 'pointer' }}
                 >
-                  오늘
+                  {isEn ? 'Today' : '오늘'}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleQuickPeriod(7)}
                   style={{ fontSize: '11px', padding: '1px 6px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '3px', cursor: 'pointer' }}
                 >
-                  7일
+                  {isEn ? '7D' : '7일'}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleQuickPeriod(30)}
                   style={{ fontSize: '11px', padding: '1px 6px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '3px', cursor: 'pointer' }}
                 >
-                  30일
+                  {isEn ? '30D' : '30일'}
                 </button>
               </div>
             </div>
@@ -355,10 +365,12 @@ const AccessLogManagement = () => {
 
           {/* 통합 검색어 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1', minWidth: '220px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>통합 검색어</label>
+            <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569' }}>
+              {isEn ? 'Search' : '통합 검색어'}
+            </label>
             <input
               type="text"
-              placeholder="사번(ID), 성명, 소속법인, 부서, 화면명, 실패사유, IP 검색"
+              placeholder={isEn ? 'Search by Emp ID, Name, Corp, Dept, Screen, Reason, IP' : '사번(ID), 성명, 소속법인, 부서, 화면명, 실패사유, IP 검색'}
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               style={{
@@ -390,7 +402,7 @@ const AccessLogManagement = () => {
               height: '36px'
             }}
           >
-            {loading ? '검색 중...' : '🔍 검색'}
+            {loading ? (isEn ? 'Searching...' : '검색 중...') : (isEn ? '🔍 Search' : '🔍 검색')}
           </button>
         </form>
       </div>
@@ -436,28 +448,28 @@ const AccessLogManagement = () => {
             <thead style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', color: '#334155' }}>
               <tr>
                 <th style={{ padding: '10px 12px', width: '60px', textAlign: 'center' }}>No.</th>
-                <th style={{ padding: '10px 12px', width: '150px' }}>발생 일시</th>
-                <th style={{ padding: '10px 12px', width: '90px', textAlign: 'center' }}>유형</th>
-                <th style={{ padding: '10px 12px', width: '170px' }}>사용자 식별 (ID / 성명)</th>
-                <th style={{ padding: '10px 12px', width: '140px' }}>소속 (법인 / 부서)</th>
-                <th style={{ padding: '10px 12px', width: '90px', textAlign: 'center' }}>권한</th>
-                <th style={{ padding: '10px 12px', width: '180px' }}>접속 화면 / 작업 내용</th>
-                <th style={{ padding: '10px 12px', width: '80px', textAlign: 'center' }}>상태</th>
-                <th style={{ padding: '10px 12px' }}>상세 사유 / 실패 원인</th>
-                <th style={{ padding: '10px 12px', width: '130px' }}>접속 IP</th>
+                <th style={{ padding: '10px 12px', width: '150px' }}>{isEn ? 'Date & Time' : '발생 일시'}</th>
+                <th style={{ padding: '10px 12px', width: '90px', textAlign: 'center' }}>{isEn ? 'Type' : '유형'}</th>
+                <th style={{ padding: '10px 12px', width: '170px' }}>{isEn ? 'User (ID / Name)' : '사용자 식별 (ID / 성명)'}</th>
+                <th style={{ padding: '10px 12px', width: '140px' }}>{isEn ? 'Affiliation (Corp / Dept)' : '소속 (법인 / 부서)'}</th>
+                <th style={{ padding: '10px 12px', width: '90px', textAlign: 'center' }}>{isEn ? 'Role' : '권한'}</th>
+                <th style={{ padding: '10px 12px', width: '180px' }}>{isEn ? 'Screen / Action' : '접속 화면 / 작업 내용'}</th>
+                <th style={{ padding: '10px 12px', width: '80px', textAlign: 'center' }}>{isEn ? 'Status' : '상태'}</th>
+                <th style={{ padding: '10px 12px' }}>{isEn ? 'Detail Reason / Failure Cause' : '상세 사유 / 실패 원인'}</th>
+                <th style={{ padding: '10px 12px', width: '130px' }}>{isEn ? 'IP Address' : '접속 IP'}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
                   <td colSpan={10} style={{ padding: '30px', textAlign: 'center', color: '#64748b' }}>
-                    감사 로그를 불러오는 중입니다...
+                    {isEn ? 'Loading audit logs...' : '감사 로그를 불러오는 중입니다...'}
                   </td>
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
                   <td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-                    조회된 감사 로그 내역이 없습니다.
+                    {isEn ? 'No audit logs found matching criteria.' : '조회된 감사 로그 내역이 없습니다.'}
                   </td>
                 </tr>
               ) : (
@@ -497,7 +509,7 @@ const AccessLogManagement = () => {
                             color: '#0369a1',
                             border: '1px solid #bae6fd'
                           }}>
-                            로그인
+                            {isEn ? 'LOGIN' : '로그인'}
                           </span>
                         ) : (
                           <span style={{
@@ -509,7 +521,7 @@ const AccessLogManagement = () => {
                             color: '#475569',
                             border: '1px solid #e2e8f0'
                           }}>
-                            화면접속
+                            {isEn ? 'PAGE' : '화면접속'}
                           </span>
                         )}
                       </td>
@@ -517,7 +529,7 @@ const AccessLogManagement = () => {
                       {/* 사용자 식별 (ID / 성명) */}
                       <td style={{ padding: '9px 12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <strong style={{ color: '#0f172a' }}>{item.userName || item.username || '(미확인)'}</strong>
+                          <strong style={{ color: '#0f172a' }}>{item.userName || item.username || (isEn ? '(Unknown)' : '(미확인)')}</strong>
                           {item.username && (
                             <span style={{ fontSize: '11.5px', color: '#64748b' }}>
                               ({item.username})
@@ -572,7 +584,7 @@ const AccessLogManagement = () => {
                             color: '#15803d',
                             border: '1px solid #bbf7d0'
                           }}>
-                            성공
+                            {isEn ? 'Success' : '성공'}
                           </span>
                         ) : (
                           <span style={{
@@ -584,7 +596,7 @@ const AccessLogManagement = () => {
                             color: '#dc2626',
                             border: '1px solid #fecaca'
                           }}>
-                            실패
+                            {isEn ? 'Failed' : '실패'}
                           </span>
                         )}
                       </td>
@@ -594,7 +606,7 @@ const AccessLogManagement = () => {
                         {!isSuccess ? (
                           <div style={{ color: '#b91c1c', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <span>⚠️</span>
-                            <span>{item.failureReason || '상세 실패 원인 미제공'}</span>
+                            <span>{item.failureReason || (isEn ? 'No detail failure cause provided' : '상세 실패 원인 미제공')}</span>
                           </div>
                         ) : (
                           <span style={{ color: '#64748b' }}>
@@ -640,7 +652,7 @@ const AccessLogManagement = () => {
                 color: page === 0 ? '#cbd5e1' : '#334155'
               }}
             >
-              « 처음
+              {isEn ? '« First' : '« 처음'}
             </button>
             <button
               type="button"
@@ -656,11 +668,11 @@ const AccessLogManagement = () => {
                 color: page === 0 ? '#cbd5e1' : '#334155'
               }}
             >
-              ‹ 이전
+              {isEn ? '‹ Prev' : '‹ 이전'}
             </button>
 
             <span style={{ fontSize: '12.5px', color: '#334155', fontWeight: 'bold', padding: '0 8px' }}>
-              {page + 1} / {totalPages} 페이지
+              {isEn ? `Page ${page + 1} of ${totalPages}` : `${page + 1} / ${totalPages} 페이지`}
             </span>
 
             <button
@@ -677,7 +689,7 @@ const AccessLogManagement = () => {
                 color: page >= totalPages - 1 ? '#cbd5e1' : '#334155'
               }}
             >
-              다음 ›
+              {isEn ? 'Next ›' : '다음 ›'}
             </button>
             <button
               type="button"
@@ -693,7 +705,7 @@ const AccessLogManagement = () => {
                 color: page >= totalPages - 1 ? '#cbd5e1' : '#334155'
               }}
             >
-              마지막 »
+              {isEn ? 'Last »' : '마지막 »'}
             </button>
           </div>
         )}

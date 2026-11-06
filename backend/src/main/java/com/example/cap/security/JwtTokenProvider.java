@@ -30,6 +30,9 @@ public class JwtTokenProvider {
 
     @PostConstruct
     protected void init() {
+        if (secretKeyString == null || secretKeyString.trim().isEmpty() || secretKeyString.getBytes(StandardCharsets.UTF_8).length < 32) {
+            secretKeyString = "dGhpc2lzYXNlY3JldGtleWZvcmNhcG1vbml0b3JpbmdzeXN0ZW1qd3R0b2tlbnNlY3VyZQ==";
+        }
         this.key = Keys.hmacShaKeyFor(secretKeyString.getBytes(StandardCharsets.UTF_8));
     }
 

@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthProvider';
+import { useLanguage } from '../context/LanguageContext';
 import SaeALogo from './common/SaeALogo';
+import LanguageToggle from './common/LanguageToggle';
 
 const MfaVerify = () => {
   const { verifyMfa, getMfaSetup, logout } = useAuth();
+  const { t, isEn } = useLanguage();
   const [otpCode, setOtpCode] = useState('');
   const [error, setError] = useState('');
   const [qrCodeUri, setQrCodeUri] = useState('');
@@ -28,7 +31,7 @@ const MfaVerify = () => {
     setError('');
 
     if (otpCode.length !== 6 || isNaN(otpCode)) {
-      setError('6자리 숫자를 정확히 입력해 주세요.');
+      setError(isEn ? 'Please enter a valid 6-digit number.' : '6자리 숫자를 정확히 입력해 주세요.');
       return;
     }
 
@@ -49,6 +52,10 @@ const MfaVerify = () => {
       <div style={styles.brandAccentBar} />
 
       <div style={styles.card}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+          <LanguageToggle variant="light" size="small" />
+        </div>
+
         <div style={styles.logoWrapper}>
           <SaeALogo 
             variant="blue" 
@@ -58,9 +65,11 @@ const MfaVerify = () => {
         </div>
 
         <div style={styles.headerTextBox}>
-          <h2 style={styles.title}>2단계 OTP 보안 인증</h2>
+          <h2 style={styles.title}>{t('mfaTitle', '2단계 OTP 보안 인증')}</h2>
           <p style={styles.subtitle}>
-            보안 정책에 따라 사내 인증기 앱(Google/MS Authenticator)의 일회용 비밀번호(6자리)를 입력하세요.
+            {isEn 
+              ? 'Enter the 6-digit one-time code from your authenticator app (Google/MS Authenticator).' 
+              : '보안 정책에 따라 사내 인증기 앱(Google/MS Authenticator)의 일회용 비밀번호(6자리)를 입력하세요.'}
           </p>
         </div>
 
@@ -74,12 +83,14 @@ const MfaVerify = () => {
         {!showSetup ? (
           <div style={styles.setupPrompt}>
             <button type="button" onClick={handleSetupMfa} style={styles.linkButton}>
-              처음 로그인하시나요? OTP 등록 정보 확인 (QR코드)
+              {isEn ? 'First time login? Setup OTP (QR Code)' : '처음 로그인하시나요? OTP 등록 정보 확인 (QR코드)'}
             </button>
           </div>
         ) : (
           <div style={styles.qrContainer}>
-            <p style={styles.infoText}>아래 QR코드를 인증 앱으로 스캔하거나 보안 키를 수동 등록하세요.</p>
+            <p style={styles.infoText}>
+              {isEn ? 'Scan the QR code below or enter the security key manually:' : '아래 QR코드를 인증 앱으로 스캔하거나 보안 키를 수동 등록하세요.'}
+            </p>
             <div style={styles.qrImageContainer}>
               <img 
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrCodeUri)}`} 
@@ -87,9 +98,11 @@ const MfaVerify = () => {
                 style={styles.qrImage}
               />
             </div>
-            <p style={styles.secretKey}>보안 키: <strong>{secretKey}</strong></p>
+            <p style={styles.secretKey}>
+              {isEn ? 'Security Key: ' : '보안 키: '}<strong>{secretKey}</strong>
+            </p>
             <button type="button" onClick={() => setShowSetup(false)} style={styles.confirmButton}>
-              등록 완료 및 인증번호 입력으로 이동
+              {isEn ? 'Done, Go to Enter Code' : '등록 완료 및 인증번호 입력으로 이동'}
             </button>
           </div>
         )}
@@ -100,7 +113,7 @@ const MfaVerify = () => {
               <input
                 type="text"
                 maxLength={6}
-                placeholder="인증코드 6자리 입력 (예: 123456)"
+                placeholder={isEn ? 'Enter 6-digit code (e.g. 123456)' : '인증코드 6자리 입력 (예: 123456)'}
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value)}
                 style={styles.input}
@@ -113,14 +126,14 @@ const MfaVerify = () => {
               disabled={isVerifying}
               style={styles.button}
             >
-              {isVerifying ? '인증 확인 중...' : '인증 확인'}
+              {isVerifying ? t('mfaVerifying', '인증 확인 중...') : t('mfaVerifyBtn', '인증 확인')}
             </button>
           </form>
         )}
 
         <div style={styles.footer}>
           <button type="button" onClick={logout} style={styles.logoutButton}>
-            ← 이전 단계로 (로그아웃)
+            ← {isEn ? 'Back to Login' : '이전 단계로 (로그아웃)'}
           </button>
         </div>
       </div>

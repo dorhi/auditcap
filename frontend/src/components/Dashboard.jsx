@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthProvider';
+import { useLanguage } from '../context/LanguageContext';
 import { isTokenValid, checkSessionOrRedirect } from '../utils/authUtils';
 import axios from 'axios';
 import MenuManagement from './MenuManagement';
@@ -7,9 +8,11 @@ import RolePermissionManagement from './RolePermissionManagement';
 import AccessLogManagement from './AccessLogManagement';
 import CustomScreenView from './CustomScreenView';
 import SaeALogo from './common/SaeALogo';
+import LanguageToggle from './common/LanguageToggle';
 
 // HTML Rich Text 에디터 컴포넌트
 const HtmlEditor = ({ value, onChange, placeholder, disabled }) => {
+  const { isEn } = useLanguage();
   const editorRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -34,14 +37,14 @@ const HtmlEditor = ({ value, onChange, placeholder, disabled }) => {
   };
 
   const insertTable = () => {
-    const rowsStr = window.prompt("생성할 표의 행(Row) 개수를 입력하세요 (예: 3)", "3");
-    const colsStr = window.prompt("생성할 표의 열(Column) 개수를 입력하세요 (예: 3)", "3");
+    const rowsStr = window.prompt(isEn ? "Enter number of table rows (e.g. 3)" : "생성할 표의 행(Row) 개수를 입력하세요 (예: 3)", "3");
+    const colsStr = window.prompt(isEn ? "Enter number of table columns (e.g. 3)" : "생성할 표의 열(Column) 개수를 입력하세요 (예: 3)", "3");
 
     const rows = parseInt(rowsStr, 10);
     const cols = parseInt(colsStr, 10);
 
     if (isNaN(rows) || isNaN(cols) || rows <= 0 || cols <= 0) {
-      alert("올바른 행/열 개수를 입력해 주세요.");
+      alert(isEn ? "Please enter valid row and column numbers." : "올바른 행/열 개수를 입력해 주세요.");
       return;
     }
 
@@ -67,31 +70,31 @@ const HtmlEditor = ({ value, onChange, placeholder, disabled }) => {
 
         <span style={editorStyles.divider}>|</span>
 
-        <button type="button" disabled={disabled} onClick={() => execCommand('insertUnorderedList')} style={editorStyles.toolBtn}>• 리스트</button>
-        <button type="button" disabled={disabled} onClick={() => execCommand('insertOrderedList')} style={editorStyles.toolBtn}>1. 리스트</button>
+        <button type="button" disabled={disabled} onClick={() => execCommand('insertUnorderedList')} style={editorStyles.toolBtn}>{isEn ? '• Bullet' : '• 리스트'}</button>
+        <button type="button" disabled={disabled} onClick={() => execCommand('insertOrderedList')} style={editorStyles.toolBtn}>{isEn ? '1. Number' : '1. 리스트'}</button>
 
         <span style={editorStyles.divider}>|</span>
 
         {/* 색상 선택 */}
         <div style={editorStyles.colorPickerContainer}>
-          <label style={editorStyles.colorLabel}>🎨 색상: </label>
+          <label style={editorStyles.colorLabel}>{isEn ? '🎨 Color: ' : '🎨 색상: '}</label>
           <input
             type="color"
             disabled={disabled}
             onChange={handleColorChange}
             style={editorStyles.colorInput}
-            title="글자색 변경"
+            title={isEn ? "Change text color" : "글자색 변경"}
           />
         </div>
 
         <span style={editorStyles.divider}>|</span>
 
         {/* 표 삽입 */}
-        <button type="button" disabled={disabled} onClick={insertTable} style={editorStyles.toolBtn}>📅 표 삽입</button>
+        <button type="button" disabled={disabled} onClick={insertTable} style={editorStyles.toolBtn}>{isEn ? '📅 Table' : '📅 표 삽입'}</button>
 
         <span style={editorStyles.divider}>|</span>
 
-        <button type="button" disabled={disabled} onClick={() => execCommand('removeFormat')} style={editorStyles.toolBtn}>서식 지우기</button>
+        <button type="button" disabled={disabled} onClick={() => execCommand('removeFormat')} style={editorStyles.toolBtn}>{isEn ? 'Clear Format' : '서식 지우기'}</button>
       </div>
       <div
         ref={editorRef}
@@ -173,6 +176,7 @@ const editorStyles = {
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
+  const { lang, setLang, t, isEn, getMenuName, getGroupName, getRoleName, getStatusName } = useLanguage();
 
   // 1. 대시보드 컴포넌트 마운트 시 세션 유효성 검사 (세션 없으면 즉시 로그인 이동)
   useEffect(() => {
@@ -210,17 +214,17 @@ const Dashboard = () => {
     AUDIT_LOG_MANAGEMENT: '',
   };
 
-  // 사용자 권한 한글 명칭 및 정렬 순서 정의 (영문 제거 및 신규 명칭 적용)
-  const ROLE_OPTIONS = [
-    { value: 'SYSTEM_ADMIN', label: '시스템 관리자' },
-    { value: 'AUDIT_LEADER', label: '감사책임자' },
-    { value: 'AUDITOR', label: '감사담당자' },
-    { value: 'CORP_HEAD', label: '법인장' },
-    { value: 'LEAD_REP', label: '법인대표담당' },
-    { value: 'MEMBER', label: '법인담당' },
-    { value: 'EXEC', label: '경영진' },
-    { value: 'DEPT_MEMBER', label: '유관부서' },
-  ];
+  // 사용자 권한 명칭 및 정렬 순서 정의 (한글/영문 자동 반영)
+  const ROLE_OPTIONS = useMemo(() => [
+    { value: 'SYSTEM_ADMIN', label: getRoleName('SYSTEM_ADMIN') },
+    { value: 'AUDIT_LEADER', label: getRoleName('AUDIT_LEADER') },
+    { value: 'AUDITOR', label: getRoleName('AUDITOR') },
+    { value: 'CORP_HEAD', label: getRoleName('CORP_HEAD') },
+    { value: 'LEAD_REP', label: getRoleName('LEAD_REP') },
+    { value: 'MEMBER', label: getRoleName('MEMBER') },
+    { value: 'EXEC', label: getRoleName('EXEC') },
+    { value: 'DEPT_MEMBER', label: getRoleName('DEPT_MEMBER') },
+  ], [isEn]);
 
   const ROLE_NAMES = {
     SYSTEM_ADMIN: '시스템 관리자',
@@ -233,7 +237,7 @@ const Dashboard = () => {
     DEPT_MEMBER: '유관부서',
   };
 
-  const getRoleKoreanName = (roleCode) => ROLE_NAMES[roleCode] || roleCode;
+  const getRoleKoreanName = (roleCode) => getRoleName(roleCode) || roleCode;
 
   // 한글 받침에 따른 조사 선택 ('로' / '으로')
   const getParticleRo = (word) => {
@@ -2295,10 +2299,10 @@ const Dashboard = () => {
                   onClick={() => toggleGroup(group.groupName)}
                   className="saea-nav-group-header"
                   style={styles.navGroupHeader}
-                  title="클릭하여 그룹 접기/펼치기"
+                  title={isEn ? 'Click to collapse/expand group' : '클릭하여 그룹 접기/펼치기'}
                 >
                   <span className="saea-nav-group-title" style={styles.navGroupTitle}>
-                    {group.groupName}
+                    {getGroupName(group.groupName)}
                   </span>
                   <span className="saea-nav-group-chevron" style={styles.navGroupChevron}>{isCollapsed ? '▶' : '▼'}</span>
                 </div>
@@ -2314,9 +2318,9 @@ const Dashboard = () => {
                           onClick={() => handleMenuClick(menu.menuCode)}
                           className="saea-sub-menu-item"
                           style={active ? styles.activeNavItem : styles.navItem}
-                          title={menu.description || menu.menuName}
+                          title={isEn ? getMenuName(menu) : (menu.description || menu.menuName)}
                         >
-                          <span style={styles.navItemText}>{menu.menuName}</span>
+                          <span style={styles.navItemText}>{getMenuName(menu)}</span>
                         </button>
                       );
                     })}
@@ -2341,28 +2345,31 @@ const Dashboard = () => {
                 return (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '12px', color: '#475569', backgroundColor: '#f1f5f9', border: '1px solid #e2e8f0', padding: '3px 10px', borderRadius: '4px', fontWeight: '600' }}>
-                      {current.groupName || '메뉴'}
+                      {getGroupName(current.groupName) || (isEn ? 'Menu' : '메뉴')}
                     </span>
                     <span style={{ color: '#94a3b8', fontSize: '13px' }}>&gt;</span>
                     <span style={{ fontSize: '18px', fontWeight: '700', color: '#1e293b' }}>
-                      {current.menuName}
+                      {getMenuName(current)}
                     </span>
                   </div>
                 );
               }
-              if (isMenuActive('PROJECT_REGISTER')) return '감사 프로젝트 신규 등록';
-              if (isMenuActive('ACTION_PLAN_INPUT')) return '감사 조치계획 등록 및 관리';
-              if (isMenuActive('FINDING_MANAGEMENT')) return '감사 지적사항 (CAP) 관리';
-              if (isMenuActive('HEAD_FINAL_APPROVAL')) return '프로젝트 최종 검증 및 확정';
-              if (isMenuActive('REPORT_MONITORING')) return '법인별 감사 조치율 현황 및 프로젝트 통제 관리';
-              if (isMenuActive('USER_MANAGEMENT')) return '사용자 계정 관리';
-              if (isMenuActive('MENU_MANAGEMENT')) return '화면 및 메뉴 관리';
-              if (isMenuActive('ROLE_PERMISSION_MANAGEMENT')) return '역할별 화면 접근 권한 관리';
-              if (isMenuActive('AUDIT_LOG_MANAGEMENT')) return '시스템 접속 및 사용 감사 로그';
-              return '화면 뷰어';
+              if (isMenuActive('PROJECT_REGISTER')) return isEn ? 'Audit Project Creation & Continuity' : '감사 프로젝트 신규 등록';
+              if (isMenuActive('ACTION_PLAN_INPUT')) return isEn ? 'CAP Action Plan & Progress Management' : '감사 조치계획 등록 및 관리';
+              if (isMenuActive('FINDING_MANAGEMENT')) return isEn ? 'Audit Findings (CAP) Review' : '감사 지적사항 (CAP) 관리';
+              if (isMenuActive('HEAD_FINAL_APPROVAL')) return isEn ? 'Project Final Verification & Sign-off' : '프로젝트 최종 검증 및 확정';
+              if (isMenuActive('REPORT_MONITORING')) return isEn ? 'Action Rate Status & Project Control' : '법인별 감사 조치율 현황 및 프로젝트 통제 관리';
+              if (isMenuActive('USER_MANAGEMENT')) return isEn ? 'User Account Management' : '사용자 계정 관리';
+              if (isMenuActive('MENU_MANAGEMENT')) return isEn ? 'Screen & Menu Admin' : '화면 및 메뉴 관리';
+              if (isMenuActive('ROLE_PERMISSION_MANAGEMENT')) return isEn ? 'Role-based Screen Access Admin' : '역할별 화면 접근 권한 관리';
+              if (isMenuActive('AUDIT_LOG_MANAGEMENT')) return isEn ? 'System Audit & Access Logs' : '시스템 접속 및 사용 감사 로그';
+              return isEn ? 'Screen Viewer' : '화면 뷰어';
             })()}
           </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* 상단 KOR/ENG 언어 선택 토글 버튼 */}
+            <LanguageToggle variant="light" size="small" />
+
             <button
               type="button"
               onClick={handleDownloadIntegratedManual}
@@ -2387,16 +2394,16 @@ const Dashboard = () => {
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = '#ffffff';
               }}
-              title="실무자, 법인대표, 법인장, 감사팀, 관리자 모든 권한의 내용이 포함된 통합 사용자 매뉴얼(PPT)을 하나의 파일로 다운로드합니다."
+              title={isEn ? 'Download Integrated User Manual (PPT) for all roles.' : '실무자, 법인대표, 법인장, 감사팀, 관리자 모든 권한의 내용이 포함된 통합 사용자 매뉴얼(PPT)을 하나의 파일로 다운로드합니다.'}
             >
               <span style={{ fontSize: '14px' }}>📥</span>
-              <span>통합 매뉴얼 다운로드 (PPT)</span>
+              <span>{t('manualDownload', '통합 매뉴얼 다운로드 (PPT)')}</span>
             </button>
             <div style={styles.topProfile}>
               <span style={styles.topProfileBadge}>{user.corpId} {user.deptName}</span>
-              <span style={styles.topProfileName}><strong>{user.name || user.username}</strong> 님 환영합니다</span>
+              <span style={styles.topProfileName}><strong>{user.name || user.username}</strong>{isEn ? ', Welcome' : ' 님 환영합니다'}</span>
             </div>
-            <button onClick={logout} style={styles.logoutBtn}>로그아웃</button>
+            <button onClick={logout} style={styles.logoutBtn}>{t('logout', '로그아웃')}</button>
           </div>
         </header>
 
@@ -2419,9 +2426,11 @@ const Dashboard = () => {
               <div style={styles.card}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>감사 프로젝트 생성 및 연계 관리</h3>
+                    <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>
+                      {t('tabProjectRegisterTitle', '감사 프로젝트 생성 및 연계 관리')}
+                    </h3>
                     <p style={{ ...styles.cardSubtitle, margin: '4px 0 0 0' }}>
-                      새로운 감사 프로젝트를 생성하거나, 이전 완료(Completion) 프로젝트를 승계하여 차기 프로젝트를 개설합니다. (감사팀 전용)
+                      {t('tabProjectRegisterSub', '새로운 감사 프로젝트를 생성하거나, 이전 완료(Completion) 프로젝트를 승계하여 차기 프로젝트를 개설합니다. (감사팀 전용)')}
                     </p>
                   </div>
 
@@ -2448,7 +2457,7 @@ const Dashboard = () => {
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      신규 프로젝트 등록
+                      {isEn ? 'New Project' : '신규 프로젝트 등록'}
                     </button>
                     <button
                       type="button"
@@ -2465,12 +2474,12 @@ const Dashboard = () => {
                         fontWeight: 'bold',
                         cursor: 'pointer',
                         backgroundColor: projectCreateMode === 'FROM_FROZEN' ? '#ffffff' : 'transparent',
-                        color: projectCreateMode === 'FROM_FROZEN' ? '#1d4ed8' : '#64748b',
+                        color: projectCreateMode === 'FROM_FROZEN' ? '#1e293b' : '#64748b',
                         boxShadow: projectCreateMode === 'FROM_FROZEN' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                         transition: 'all 0.15s ease'
                       }}
                     >
-                      완료 프로젝트 기반 차기 프로젝트 생성
+                      {isEn ? 'Succeed Completed Project' : '이전 완료 프로젝트 승계 개설'}
                     </button>
                   </div>
                 </div>
@@ -2478,10 +2487,12 @@ const Dashboard = () => {
                 {projectCreateMode === 'NEW' ? (
                   <form onSubmit={handleCreateProject} style={styles.form}>
                     <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>프로젝트명 (연도_법인명 규칙 필히 준수)</label>
+                      <label style={styles.formLabel}>
+                        {isEn ? 'Project Name (Format: Year_CorpName Required)' : '프로젝트명 (연도_법인명 규칙 필히 준수)'}
+                      </label>
                       <input
                         type="text"
-                        placeholder="예: 2026_법인A"
+                        placeholder={isEn ? 'e.g. 2026_CorpA' : '예: 2026_법인A'}
                         value={newProjectName}
                         onChange={(e) => setNewProjectName(e.target.value)}
                         required
@@ -2490,7 +2501,7 @@ const Dashboard = () => {
                     </div>
 
                     <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>소속법인</label>
+                      <label style={styles.formLabel}>{isEn ? 'Corporation' : '소속법인'}</label>
                       {(() => {
                         const existingCorps = Array.from(new Set(usersList.map(u => u.corpId).filter(Boolean))).sort();
                         const corpsToRender = existingCorps.length > 0 ? existingCorps : ['CORP_A', 'CORP_B', 'CORP_C'];
@@ -2508,17 +2519,17 @@ const Dashboard = () => {
                               style={styles.select}
                               required
                             >
-                              <option value="">-- 소속법인 선택 --</option>
+                              <option value="">{isEn ? '-- Select Corporation --' : '-- 소속법인 선택 --'}</option>
                               {corpsToRender.map(corp => (
                                 <option key={corp} value={corp}>{corp}</option>
                               ))}
-                              <option value="__NEW__">➕ 신규 법인 직접 입력...</option>
+                              <option value="__NEW__">{isEn ? '➕ Enter new corporation manually...' : '➕ 신규 법인 직접 입력...'}</option>
                             </select>
 
                             {newProjectCorp === '__NEW__' && (
                               <input
                                 type="text"
-                                placeholder="신규 소속법인 코드 또는 명칭 입력"
+                                placeholder={isEn ? 'Enter new corporation code or name' : '신규 소속법인 코드 또는 명칭 입력'}
                                 value={customProjectCorpInput}
                                 onChange={(e) => setCustomProjectCorpInput(e.target.value)}
                                 required
@@ -2533,7 +2544,7 @@ const Dashboard = () => {
                     {/* 1. 소속법인 접근 허용 사용자 (해당 법인 사용자 직접 선택 - 필수) */}
                     <div style={styles.formGroup}>
                       <label style={styles.formLabel}>
-                        소속법인 접근 허용 사용자 <span style={{ color: '#ef4444' }}>* (필수 선택)</span>
+                        {isEn ? 'Authorized Corporation Users' : '소속법인 접근 허용 사용자'} <span style={{ color: '#ef4444' }}>* ({isEn ? 'Required' : '필수 선택'})</span>
                       </label>
                       {(() => {
                         const effectiveCorp = newProjectCorp === '__NEW__' ? customProjectCorpInput.trim() : newProjectCorp;
@@ -2548,7 +2559,9 @@ const Dashboard = () => {
                               color: '#64748b',
                               fontSize: '12px'
                             }}>
-                              👆 먼저 위의 <b>소속법인</b>을 선택하시면 해당 법인의 사용자 목록이 활성화됩니다.
+                              {isEn 
+                                ? <>👆 Please select a <b>Corporation</b> above first to activate user list.</>
+                                : <>👆 먼저 위의 <b>소속법인</b>을 선택하시면 해당 법인의 사용자 목록이 활성화됩니다.</>}
                             </div>
                           );
                         }
@@ -2568,15 +2581,15 @@ const Dashboard = () => {
                             >
                               <option value="">
                                 {corpUsers.length > 0
-                                  ? `-- [${effectiveCorp}] 소속 사용자 선택 (클릭 시 추가) --`
-                                  : `-- [${effectiveCorp}] 소속 등록 사용자가 없습니다 --`}
+                                  ? (isEn ? `-- Select [${effectiveCorp}] User (Click to add) --` : `-- [${effectiveCorp}] 소속 사용자 선택 (클릭 시 추가) --`)
+                                  : (isEn ? `-- No registered users in [${effectiveCorp}] --` : `-- [${effectiveCorp}] 소속 등록 사용자가 없습니다 --`)}
                               </option>
                               {corpUsers.map(u => {
                                 const isAlreadySelected = selectedCorpUsers.includes(u.username);
                                 const roleLabel = getRoleKoreanName(u.role);
                                 return (
                                   <option key={u.username} value={u.username} disabled={isAlreadySelected}>
-                                    {u.name || u.username} (ID: {u.username} / {u.deptName ? `${u.deptName} · ` : ''}{roleLabel}) {isAlreadySelected ? ' [선택됨]' : ''}
+                                    {u.name || u.username} (ID: {u.username} / {u.deptName ? `${u.deptName} · ` : ''}{roleLabel}) {isAlreadySelected ? (isEn ? ' [Selected]' : ' [선택됨]') : ''}
                                   </option>
                                 );
                               })}
@@ -2613,7 +2626,7 @@ const Dashboard = () => {
                                         <button
                                           type="button"
                                           onClick={() => handleRemoveCorpUser(userId)}
-                                          title="제거"
+                                          title={isEn ? 'Remove' : '제거'}
                                           style={{
                                             background: 'none',
                                             border: 'none',
@@ -2633,12 +2646,16 @@ const Dashboard = () => {
                                   })}
                                 </div>
                                 <div style={{ fontSize: '12px', color: '#1d4ed8', marginTop: '8px', fontWeight: 'bold' }}>
-                                  ※ 지정된 소속법인 {selectedCorpUsers.length}명의 사용자에게 해당 프로젝트 접근 권한이 부여됩니다.
+                                  {isEn 
+                                    ? `※ Access granted to ${selectedCorpUsers.length} assigned corporation users.`
+                                    : `※ 지정된 소속법인 ${selectedCorpUsers.length}명의 사용자에게 해당 프로젝트 접근 권한이 부여됩니다.`}
                                 </div>
                               </div>
                             ) : (
                               <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '6px', fontWeight: 'bold' }}>
-                                ※ 소속법인 사용자는 <b>필수 선택 항목</b>입니다. 위 드롭다운에서 접근을 허용할 법인 사용자를 최소 1명 이상 추가해 주세요.
+                                {isEn 
+                                  ? <>※ Corporation users are <b>required</b>. Please add at least 1 user from the dropdown above.</>
+                                  : <>※ 소속법인 사용자는 <b>필수 선택 항목</b>입니다. 위 드롭다운에서 접근을 허용할 법인 사용자를 최소 1명 이상 추가해 주세요.</>}
                               </div>
                             )}
                           </div>
@@ -2648,7 +2665,9 @@ const Dashboard = () => {
 
                     {/* 2. 접근허용 유관부서 담당자 (법인에 관계없이 선택 가능) */}
                     <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>접근허용 유관부서 담당자 (선택 - 법인 무관)</label>
+                      <label style={styles.formLabel}>
+                        {isEn ? 'Authorized Dept. Members (Optional - Any Corp)' : '접근허용 유관부서 담당자 (선택 - 법인 무관)'}
+                      </label>
                       {(() => {
                         const deptMemberUsers = usersList.filter(u => u.role === 'DEPT_MEMBER' && u.enabled !== false);
                         return (
@@ -2664,14 +2683,14 @@ const Dashboard = () => {
                             >
                               <option value="">
                                 {deptMemberUsers.length > 0
-                                  ? '-- 유관부서 담당자 선택 (법인에 상관없이 추가할 사용자를 클릭하세요) --'
-                                  : '-- 등록된 유관부서 사용자가 없습니다 (사용자 관리에서 유관부서 권한 등록 필요) --'}
+                                  ? (isEn ? '-- Select Dept. Member (Click to add regardless of corp) --' : '-- 유관부서 담당자 선택 (법인에 상관없이 추가할 사용자를 클릭하세요) --')
+                                  : (isEn ? '-- No registered Dept. Member users (Assign role in User Management) --' : '-- 등록된 유관부서 사용자가 없습니다 (사용자 관리에서 유관부서 권한 등록 필요) --')}
                               </option>
                               {deptMemberUsers.map(u => {
                                 const isAlreadySelected = selectedDeptUsers.includes(u.username);
                                 return (
                                   <option key={u.username} value={u.username} disabled={isAlreadySelected}>
-                                    {u.name || u.username} (ID: {u.username} / {u.corpId} {u.deptName ? `· ${u.deptName}` : ''}) {isAlreadySelected ? ' [선택됨]' : ''}
+                                    {u.name || u.username} (ID: {u.username} / {u.corpId} {u.deptName ? `· ${u.deptName}` : ''}) {isAlreadySelected ? (isEn ? ' [Selected]' : ' [선택됨]') : ''}
                                   </option>
                                 );
                               })}
@@ -2707,7 +2726,7 @@ const Dashboard = () => {
                                         <button
                                           type="button"
                                           onClick={() => handleRemoveDeptUser(userId)}
-                                          title="제거"
+                                          title={isEn ? 'Remove' : '제거'}
                                           style={{
                                             background: 'none',
                                             border: 'none',
@@ -2727,12 +2746,16 @@ const Dashboard = () => {
                                   })}
                                 </div>
                                 <div style={{ fontSize: '12px', color: '#db2777', marginTop: '8px', fontWeight: 'bold' }}>
-                                  ※ 지정된 {selectedDeptUsers.length}명의 유관부서 담당자에게 본 프로젝트 접근 및 조치 참여 권한이 부여됩니다.
+                                  {isEn 
+                                    ? `※ Access granted to ${selectedDeptUsers.length} assigned Dept. Members.`
+                                    : `※ 지정된 ${selectedDeptUsers.length}명의 유관부서 담당자에게 본 프로젝트 접근 및 조치 참여 권한이 부여됩니다.`}
                                 </div>
                               </div>
                             ) : (
                               <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '6px' }}>
-                                * 유관부서(DEPT_MEMBER) 권한을 가진 사용자를 <b>법인에 관계없이</b> 선택하여 지정할 수 있습니다. (선택된 유관부서 담당자는 해당 프로젝트를 열람하고 조치에 참여할 수 있습니다)
+                                {isEn 
+                                  ? <>* Users with <b>Dept. Member</b> role can be assigned regardless of corp to participate in this project.</>
+                                  : <>* 유관부서(DEPT_MEMBER) 권한을 가진 사용자를 <b>법인에 관계없이</b> 선택하여 지정할 수 있습니다. (선택된 유관부서 담당자는 해당 프로젝트를 열람하고 조치에 참여할 수 있습니다)</>}
                               </div>
                             )}
                           </div>
@@ -2752,7 +2775,7 @@ const Dashboard = () => {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <label style={{ ...styles.formLabel, whiteSpace: 'nowrap', marginBottom: 0, color: '#1e293b' }}>
-                          마감일 <span style={{ color: '#ef4444' }}>*</span>
+                          {isEn ? 'Due Date' : '마감일'} <span style={{ color: '#ef4444' }}>*</span>
                         </label>
                         <input
                           type="date"
@@ -2764,7 +2787,9 @@ const Dashboard = () => {
                       </div>
                     </div>
 
-                    <button type="submit" style={styles.primaryBtn}>신규 프로젝트 저장</button>
+                    <button type="submit" style={styles.primaryBtn}>
+                      {isEn ? 'Save New Project' : '신규 프로젝트 저장'}
+                    </button>
                   </form>
                 ) : (
                   /* 완료 프로젝트 기반 차기 프로젝트 생성 폼 */
@@ -2778,7 +2803,7 @@ const Dashboard = () => {
                     }}>
                       <div style={styles.formGroup}>
                         <label style={{ ...styles.formLabel, fontWeight: 'bold', color: '#1e293b' }}>
-                          기반이 될 이전 완료(Completion) 프로젝트 선택 <span style={{ color: '#ef4444' }}>*</span>
+                          {isEn ? 'Select Previous Completed Project to Succeed' : '기반이 될 이전 완료(Completion) 프로젝트 선택'} <span style={{ color: '#ef4444' }}>*</span>
                         </label>
                         <select
                           value={selectedFrozenParentId}
@@ -2796,16 +2821,18 @@ const Dashboard = () => {
                           style={styles.select}
                           required
                         >
-                          <option value="">-- 완료(Completion) 프로젝트 선택 --</option>
+                          <option value="">{isEn ? '-- Select Completed Project --' : '-- 완료(Completion) 프로젝트 선택 --'}</option>
                           {frozenProjects.map(fp => (
                             <option key={fp.projectId} value={fp.projectId}>
-                              [{fp.corpId}] {fp.projectName} ({fp.round || 1}차 프로젝트)
+                              [{fp.corpId}] {fp.projectName} ({fp.round || 1}{isEn ? ' Round' : '차 프로젝트'})
                             </option>
                           ))}
                         </select>
                         {frozenProjects.length === 0 && (
                           <div style={{ fontSize: '12px', color: '#dc2626', marginTop: '6px' }}>
-                            ※ 현재 최종 완료(Completion)된 프로젝트가 없습니다. (법인장 최종 확정이 완료된 프로젝트만 모태로 승계 가능합니다)
+                            {isEn 
+                              ? '※ No completed projects available to succeed. (Only projects with Corp Head final confirmation can be succeeded)'
+                              : '※ 현재 최종 완료(Completion)된 프로젝트가 없습니다. (법인장 최종 확정이 완료된 프로젝트만 모태로 승계 가능합니다)'}
                           </div>
                         )}
                       </div>
@@ -2815,30 +2842,34 @@ const Dashboard = () => {
                         <div style={{ marginTop: '14px', padding: '16px', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                             <h4 style={{ margin: 0, fontSize: '15px', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              이전 차수 CAP 승계 분석 결과
+                              {isEn ? 'Previous Round CAP Succession Analysis' : '이전 차수 CAP 승계 분석 결과'}
                             </h4>
                             <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#0284c7', backgroundColor: '#e0f2fe', padding: '3px 8px', borderRadius: '4px' }}>
-                              소속 법인: {selectedParentProject.corpId} · 차수: {(selectedParentProject.round || 1)}차 ➔ {(selectedParentProject.round || 1) + 1}차 생성
+                              {isEn 
+                                ? `Corp: ${selectedParentProject.corpId} · Round: ${(selectedParentProject.round || 1)} ➔ ${(selectedParentProject.round || 1) + 1}`
+                                : `소속 법인: ${selectedParentProject.corpId} · 차수: ${(selectedParentProject.round || 1)}차 ➔ ${(selectedParentProject.round || 1) + 1}차 생성`}
                             </span>
                           </div>
 
                           <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
                             <div style={{ flex: '1 1 120px', padding: '10px 14px', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                              <div style={{ fontSize: '12px', color: '#64748b' }}>이전 프로젝트 총 CAP</div>
-                              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b' }}>{parentFindings.length}건</div>
+                              <div style={{ fontSize: '12px', color: '#64748b' }}>{isEn ? 'Total Previous CAPs' : '이전 프로젝트 총 CAP'}</div>
+                              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b' }}>{parentFindings.length}{isEn ? ' items' : '건'}</div>
                             </div>
                             <div style={{ flex: '1 1 120px', padding: '10px 14px', backgroundColor: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
-                              <div style={{ fontSize: '12px', color: '#166534' }}>제외 대상 (개선완료)</div>
-                              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#15803d' }}>{completedFindings.length}건</div>
+                              <div style={{ fontSize: '12px', color: '#166534' }}>{isEn ? 'Excluded (Completed)' : '제외 대상 (개선완료)'}</div>
+                              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#15803d' }}>{completedFindings.length}{isEn ? ' items' : '건'}</div>
                             </div>
                             <div style={{ flex: '1 1 120px', padding: '10px 14px', backgroundColor: '#eff6ff', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
-                              <div style={{ fontSize: '12px', color: '#1d4ed8' }}>승계 대상 (미완료 항목)</div>
-                              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2563eb' }}>{inheritableFindings.length}건</div>
+                              <div style={{ fontSize: '12px', color: '#1d4ed8' }}>{isEn ? 'Inherited (Incomplete)' : '승계 대상 (미완료 항목)'}</div>
+                              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#2563eb' }}>{inheritableFindings.length}{isEn ? ' items' : '건'}</div>
                             </div>
                           </div>
 
                           <div style={{ fontSize: '13px', color: '#0369a1', lineHeight: '1.5', marginBottom: inheritableFindings.length > 0 ? '12px' : '0' }}>
-                            ※ <b>승계 규칙:</b> 이전 차수에서 '개선완료'된 {completedFindings.length}건은 종결되어 차기 프로젝트에서 자동 제외되며, <b>미완료({inheritableFindings.length}건)</b> 항목만 신규 프로젝트로 승계되어 계속 관리됩니다. (승계된 CAP은 '작성중(DRAFT)' 상태로 초기화되어 새로운 조치 답변을 등록할 수 있습니다)
+                            {isEn 
+                              ? <>※ <b>Succession Rule:</b> {completedFindings.length} 'Completed' items from previous round are closed and excluded. Only <b>{inheritableFindings.length} incomplete items</b> will succeed to new project. (Succeeded CAPs reset to 'DRAFT' status for new actions)</>
+                              : <>※ <b>승계 규칙:</b> 이전 차수에서 '개선완료'된 {completedFindings.length}건은 종결되어 차기 프로젝트에서 자동 제외되며, <b>미완료({inheritableFindings.length}건)</b> 항목만 신규 프로젝트로 승계되어 계속 관리됩니다. (승계된 CAP은 '작성중(DRAFT)' 상태로 초기화되어 새로운 조치 답변을 등록할 수 있습니다)</>}
                           </div>
 
                           {inheritableFindings.length > 0 && (
@@ -2846,11 +2877,11 @@ const Dashboard = () => {
                               <table style={{ ...styles.table, marginTop: 0 }}>
                                 <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f8fafc' }}>
                                   <tr>
-                                    <th style={{ ...styles.th, width: '80px', textAlign: 'center' }}>원래 CAP</th>
-                                    <th style={{ ...styles.th, width: '100px' }}>분류</th>
-                                    <th style={styles.th}>발견사항 제목</th>
-                                    <th style={{ ...styles.th, width: '120px' }}>담당자</th>
-                                    <th style={{ ...styles.th, width: '110px', textAlign: 'center' }}>현재 조치상태</th>
+                                    <th style={{ ...styles.th, width: '80px', textAlign: 'center' }}>{isEn ? 'Original CAP' : '원래 CAP'}</th>
+                                    <th style={{ ...styles.th, width: '100px' }}>{isEn ? 'Category' : '분류'}</th>
+                                    <th style={styles.th}>{isEn ? 'Finding Title' : '발견사항 제목'}</th>
+                                    <th style={{ ...styles.th, width: '120px' }}>{isEn ? 'Assignee' : '담당자'}</th>
+                                    <th style={{ ...styles.th, width: '110px', textAlign: 'center' }}>{isEn ? 'Action Status' : '현재 조치상태'}</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -2866,7 +2897,9 @@ const Dashboard = () => {
                                           fontWeight: 'bold',
                                           color: f.actionStatusCode === 'IN_PROGRESS' ? '#d97706' : (f.actionStatusCode === 'ACTION_IMPOSSIBLE' ? '#dc2626' : (f.actionStatusCode === 'CONTINUOUS_MANAGEMENT' ? '#2563eb' : '#64748b'))
                                         }}>
-                                          {f.actionStatusCode === 'IN_PROGRESS' ? '개선중' : (f.actionStatusCode === 'ACTION_IMPOSSIBLE' ? '개선불가' : (f.actionStatusCode === 'CONTINUOUS_MANAGEMENT' ? '지속관리' : '미작성'))}
+                                          {isEn
+                                            ? (f.actionStatusCode === 'IN_PROGRESS' ? 'In Progress' : (f.actionStatusCode === 'ACTION_IMPOSSIBLE' ? 'Impossible' : (f.actionStatusCode === 'CONTINUOUS_MANAGEMENT' ? 'Continuous' : 'Draft')))
+                                            : (f.actionStatusCode === 'IN_PROGRESS' ? '개선중' : (f.actionStatusCode === 'ACTION_IMPOSSIBLE' ? '개선불가' : (f.actionStatusCode === 'CONTINUOUS_MANAGEMENT' ? '지속관리' : '미작성')))}
                                         </span>
                                       </td>
                                     </tr>
@@ -2881,11 +2914,11 @@ const Dashboard = () => {
 
                     <div style={styles.formGroup}>
                       <label style={styles.formLabel}>
-                        신규 프로젝트명 <span style={{ color: '#ef4444' }}>*</span> (추천 명칭 자동 입력됨)
+                        {isEn ? 'New Project Name' : '신규 프로젝트명'} <span style={{ color: '#ef4444' }}>*</span> {isEn ? '(Auto-filled)' : '(추천 명칭 자동 입력됨)'}
                       </label>
                       <input
                         type="text"
-                        placeholder="예: 2026_법인A_2차"
+                        placeholder={isEn ? 'e.g. 2026_CorpA_Round2' : '예: 2026_법인A_2차'}
                         value={newProjectName}
                         onChange={(e) => setNewProjectName(e.target.value)}
                         required
@@ -2905,7 +2938,7 @@ const Dashboard = () => {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <label style={{ ...styles.formLabel, whiteSpace: 'nowrap', marginBottom: 0, color: '#1e293b' }}>
-                          차기 프로젝트 마감일 <span style={{ color: '#ef4444' }}>*</span>
+                          {isEn ? 'Next Due Date' : '차기 프로젝트 마감일'} <span style={{ color: '#ef4444' }}>*</span>
                         </label>
                         <input
                           type="date"
@@ -2926,7 +2959,9 @@ const Dashboard = () => {
                         cursor: selectedFrozenParentId ? 'pointer' : 'not-allowed'
                       }}
                     >
-                      완료 프로젝트 기반 차기 프로젝트 생성 및 CAP 승계 ({inheritableFindings.length}건)
+                      {isEn 
+                        ? `Create Project & Succeed CAPs (${inheritableFindings.length} items)` 
+                        : `완료 프로젝트 기반 차기 프로젝트 생성 및 CAP 승계 (${inheritableFindings.length}건)`}
                     </button>
                   </form>
                 )}
@@ -2996,10 +3031,12 @@ const Dashboard = () => {
                 }}>
                   <div>
                     <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>
-                      감사 조치계획 및 필수 정보 입력
+                      {t('tabActionPlanTitle', '감사 조치계획 & 필수 정보 입력')}
                     </h3>
                     <p style={{ ...styles.cardSubtitle, margin: '6px 0 0 0' }}>
-                      프로젝트 및 발견사항을 검색/선택하고, 개선 조치계획을 등록하여 <b>일반담당자 ➔ 대표담당자 ➔ 감사팀</b> 순으로 결재 검증을 진행합니다.
+                      {isEn 
+                        ? 'Search/select projects & findings, register CAP action plans, and submit for Rep. & Auditor review.'
+                        : '프로젝트 및 발견사항을 검색/선택하고, 개선 조치계획을 등록하여 일반담당자 ➔ 대표담당자 ➔ 감사팀 순으로 결재 검증을 진행합니다.'}
                     </p>
                   </div>
 
@@ -3017,7 +3054,9 @@ const Dashboard = () => {
                   }}>
                     {/* 1) 조회기간 from to */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>마감기한:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Due Date:' : '마감기한:'}
+                      </span>
                       <input
                         type="date"
                         value={actionFilterDateFrom}
@@ -3035,34 +3074,38 @@ const Dashboard = () => {
 
                     {/* 2) 소속법인 콤보 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>소속법인:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Corp.:' : '소속법인:'}
+                      </span>
                       {isAuditTeamOrExec ? (
                         <select
                           value={actionFilterCorp}
                           onChange={(e) => setActionFilterCorp(e.target.value)}
                           style={{ padding: '5px 8px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
                         >
-                          <option value="">[ 전체 법인 ]</option>
+                          <option value="">{isEn ? '[ All Corps ]' : '[ 전체 법인 ]'}</option>
                           {uniqueActionCorps.map(corp => (
                             <option key={corp} value={corp}>{corp}</option>
                           ))}
                         </select>
                       ) : (
                         <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#1e293b', backgroundColor: '#e2e8f0', padding: '4px 8px', borderRadius: '4px' }}>
-                          {user.corpId} (고정)
+                          {user.corpId} {isEn ? '(Fixed)' : '(고정)'}
                         </span>
                       )}
                     </div>
 
                     {/* 3) 부서명 콤보 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>부서명:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Dept.:' : '부서명:'}
+                      </span>
                       <select
                         value={actionFilterDept}
                         onChange={(e) => setActionFilterDept(e.target.value)}
                         style={{ padding: '5px 8px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
                       >
-                        <option value="">[ 전체 부서 ]</option>
+                        <option value="">{isEn ? '[ All Depts ]' : '[ 전체 부서 ]'}</option>
                         {uniqueActionDepts.map(dept => (
                           <option key={dept} value={dept}>{dept}</option>
                         ))}
@@ -3071,11 +3114,13 @@ const Dashboard = () => {
 
                     {/* 4) 프로젝트 명 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>프로젝트명:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Project:' : '프로젝트명:'}
+                      </span>
                       <input
                         list="actionPlanProjectDataList"
                         type="text"
-                        placeholder="선택 또는 직접입력..."
+                        placeholder={isEn ? 'Select or type...' : '선택 또는 직접입력...'}
                         value={actionFilterProject}
                         onChange={(e) => setActionFilterProject(e.target.value)}
                         style={{ padding: '5px 8px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1', width: '170px' }}
@@ -3089,13 +3134,15 @@ const Dashboard = () => {
 
                     {/* 5) 담당자 콤보 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>담당자:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Assignee:' : '담당자:'}
+                      </span>
                       <select
                         value={actionFilterAssignee}
                         onChange={(e) => setActionFilterAssignee(e.target.value)}
                         style={{ padding: '5px 8px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
                       >
-                        <option value="">[ 전체 담당자 ]</option>
+                        <option value="">{isEn ? '[ All Assignees ]' : '[ 전체 담당자 ]'}</option>
                         {uniqueActionAssignees.map(ass => (
                           <option key={ass} value={ass}>{ass}</option>
                         ))}
@@ -3104,18 +3151,20 @@ const Dashboard = () => {
 
                     {/* 6) 결재상태 콤보 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>결재현황:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Approval:' : '결재현황:'}
+                      </span>
                       <select
                         value={actionFilterApproval}
                         onChange={(e) => setActionFilterApproval(e.target.value)}
                         style={{ padding: '5px 8px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
                       >
-                        <option value="">[ 전체 ]</option>
-                        <option value="DRAFT">작성중 (임시저장)</option>
-                        <option value="PENDING_LEAD">대표담당자 승인대기</option>
-                        <option value="PENDING_AUDIT">감사실 검증대기</option>
-                        <option value="REJECTED">재수정/재작성 요청 건</option>
-                        <option value="AUDIT_CONFIRMED">감사팀 검토완료</option>
+                        <option value="">{isEn ? '[ All ]' : '[ 전체 ]'}</option>
+                        <option value="DRAFT">{isEn ? 'Draft (Temp)' : '작성중 (임시저장)'}</option>
+                        <option value="PENDING_LEAD">{isEn ? 'Pending Rep Approval' : '대표담당자 승인대기'}</option>
+                        <option value="PENDING_AUDIT">{isEn ? 'Pending Audit Review' : '감사실 검증대기'}</option>
+                        <option value="REJECTED">{isEn ? 'Revision Requested' : '재수정/재작성 요청 건'}</option>
+                        <option value="AUDIT_CONFIRMED">{isEn ? 'Audit Confirmed' : '감사팀 검토완료'}</option>
                       </select>
                     </div>
 
@@ -3141,7 +3190,7 @@ const Dashboard = () => {
                           onChange={(e) => setExcludeCompleted(e.target.checked)}
                           style={{ cursor: 'pointer', width: '15px', height: '15px' }}
                         />
-                        <span>개선완료 항목 제외</span>
+                        <span>{isEn ? 'Exclude Completed' : '개선완료 항목 제외'}</span>
                       </label>
                     </div>
 
@@ -3174,7 +3223,7 @@ const Dashboard = () => {
                           fontWeight: 'bold'
                         }}
                       >
-                        필터 초기화
+                        {isEn ? 'Reset Filters' : '필터 초기화'}
                       </button>
                     )}
                   </div>
@@ -3184,10 +3233,12 @@ const Dashboard = () => {
                 <div style={styles.card}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <h4 style={{ margin: 0, fontSize: '15px', color: '#334155' }}>
-                      감사 대상 목록 <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#64748b' }}>(총 {filteredActionFindings.length}건{excludeCompleted ? ' · 개선완료 제외됨' : ''})</span>
+                      {isEn ? 'Audit Findings List' : '감사 대상 목록'} <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#64748b' }}>({isEn ? 'Total ' : '총 '}{filteredActionFindings.length}{isEn ? ' items' : '건'}{excludeCompleted ? (isEn ? ' · Excl. Completed' : ' · 개선완료 제외됨') : ''})</span>
                     </h4>
                     <span style={{ fontSize: '12px', color: '#64748b' }}>
-                      ※ 행을 클릭하면 하단에서 상세 조치사항 작성 및 결재 승인을 진행할 수 있습니다.
+                      {isEn 
+                        ? '※ Click a row to write CAP action plans and manage approval below.'
+                        : '※ 행을 클릭하면 하단에서 상세 조치사항 작성 및 결재 승인을 진행할 수 있습니다.'}
                     </span>
                   </div>
 
@@ -3195,17 +3246,17 @@ const Dashboard = () => {
                     <table style={{ ...styles.table, marginTop: 0 }}>
                       <thead style={{ position: 'sticky', top: 0, zIndex: 5, backgroundColor: '#f1f5f9' }}>
                         <tr>
-                          <th style={{ ...styles.th, width: '40px', textAlign: 'center' }}>선택</th>
-                          <th style={styles.th}>소속법인</th>
-                          <th style={styles.th}>프로젝트명</th>
-                          <th style={styles.th}>부서명</th>
-                          <th style={styles.th}>담당자</th>
-                          <th style={styles.th}>분류</th>
-                          <th style={{ ...styles.th, minWidth: '200px' }}>발견사항 세부 제목</th>
-                          <th style={styles.th}>감사팀 예상 마감일</th>
-                          <th style={styles.th}>개선 예상 시기</th>
-                          <th style={styles.th}>결재/검증 현황</th>
-                          <th style={styles.th}>조치 상태</th>
+                          <th style={{ ...styles.th, width: '40px', textAlign: 'center' }}>{isEn ? 'Sel.' : '선택'}</th>
+                          <th style={styles.th}>{isEn ? 'Corp.' : '소속법인'}</th>
+                          <th style={styles.th}>{isEn ? 'Project' : '프로젝트명'}</th>
+                          <th style={styles.th}>{isEn ? 'Dept.' : '부서명'}</th>
+                          <th style={styles.th}>{isEn ? 'Assignee' : '담당자'}</th>
+                          <th style={styles.th}>{isEn ? 'Category' : '분류'}</th>
+                          <th style={{ ...styles.th, minWidth: '200px' }}>{isEn ? 'Finding Title' : '발견사항 세부 제목'}</th>
+                          <th style={styles.th}>{isEn ? 'Audit Due Date' : '감사팀 예상 마감일'}</th>
+                          <th style={styles.th}>{isEn ? 'Target Date' : '개선 예상 시기'}</th>
+                          <th style={styles.th}>{isEn ? 'Approval Status' : '결재/검증 현황'}</th>
+                          <th style={styles.th}>{isEn ? 'Action Status' : '조치 상태'}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3336,15 +3387,15 @@ const Dashboard = () => {
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {/* 결재 상태 배지 */}
-                          {isDraft && <span style={{ ...styles.badgeStatus, backgroundColor: '#f1f5f9', color: '#475569' }}>작성중 (임시저장)</span>}
-                          {isPendingLead && <span style={{ ...styles.badgeStatus, backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>대표담당자 확인대기</span>}
-                          {isPendingAudit && <span style={{ ...styles.badgeStatus, backgroundColor: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe' }}>감사실 검증대기</span>}
-                          {isRejectedLead && <span style={{ ...styles.badgeStatus, backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}>대표담당자 재수정 요청</span>}
-                          {isRejectedAudit && <span style={{ ...styles.badgeStatus, backgroundColor: '#ffedd5', color: '#c2410c', border: '1px solid #fed7aa' }}>감사실 재작성 요청 (보완)</span>}
-                          {isAuditConfirmed && <span style={{ ...styles.badgeStatus, backgroundColor: '#dbeafe', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>감사담당자 확인완료 (조치종료)</span>}
+                          {isDraft && <span style={{ ...styles.badgeStatus, backgroundColor: '#f1f5f9', color: '#475569' }}>{isEn ? 'Draft (Temp)' : '작성중 (임시저장)'}</span>}
+                          {isPendingLead && <span style={{ ...styles.badgeStatus, backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>{isEn ? 'Pending Rep Review' : '대표담당자 확인대기'}</span>}
+                          {isPendingAudit && <span style={{ ...styles.badgeStatus, backgroundColor: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe' }}>{isEn ? 'Pending Audit Review' : '감사실 검증대기'}</span>}
+                          {isRejectedLead && <span style={{ ...styles.badgeStatus, backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}>{isEn ? 'Rep. Revision Req.' : '대표담당자 재수정 요청'}</span>}
+                          {isRejectedAudit && <span style={{ ...styles.badgeStatus, backgroundColor: '#ffedd5', color: '#c2410c', border: '1px solid #fed7aa' }}>{isEn ? 'Audit Revision Req.' : '감사실 재작성 요청 (보완)'}</span>}
+                          {isAuditConfirmed && <span style={{ ...styles.badgeStatus, backgroundColor: '#dbeafe', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>{isEn ? 'Audit Confirmed (Closed)' : '감사담당자 확인완료 (조치종료)'}</span>}
 
                           <span style={f.project?.projectState === 'FREEZE' ? styles.badgeFreeze : styles.badgeOpen}>
-                            {f.project?.projectState === 'FREEZE' ? '완료 (Completion)' : '진행중 (OPEN)'}
+                            {f.project?.projectState === 'FREEZE' ? (isEn ? 'Completed' : '완료 (Completion)') : (isEn ? 'OPEN' : '진행중 (OPEN)')}
                           </span>
                         </div>
                       </div>
@@ -3357,7 +3408,7 @@ const Dashboard = () => {
                             backgroundColor: 'var(--saea-blue, #0077C8)',
                             color: '#fff'
                           }}>1</div>
-                          <span style={styles.timelineLabel}>법인담당자 조치</span>
+                          <span style={styles.timelineLabel}>{isEn ? 'Corp Action' : '법인담당자 조치'}</span>
                           <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', whiteSpace: 'nowrap' }}>
                             {f.updatedAt ? new Date(f.updatedAt).toLocaleDateString() : (f.createdAt ? new Date(f.createdAt).toLocaleDateString() : '-')}
                           </span>
@@ -3369,9 +3420,9 @@ const Dashboard = () => {
                             backgroundColor: isPendingAudit || isAuditConfirmed ? 'var(--saea-blue, #0077C8)' : (isPendingLead ? '#d97706' : '#94a3b8'),
                             color: '#fff'
                           }}>2</div>
-                          <span style={styles.timelineLabel}>대표담당자 확인</span>
+                          <span style={styles.timelineLabel}>{isEn ? 'Rep Review' : '대표담당자 확인'}</span>
                           <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', whiteSpace: 'nowrap' }}>
-                            {f.leadApprovedAt ? new Date(f.leadApprovedAt).toLocaleDateString() : (isPendingLead ? '확인 진행중' : '-')}
+                            {f.leadApprovedAt ? new Date(f.leadApprovedAt).toLocaleDateString() : (isPendingLead ? (isEn ? 'In progress' : '확인 진행중') : '-')}
                           </span>
                         </div>
                         <div style={{ ...styles.timelineLine, backgroundColor: isAuditConfirmed ? 'var(--saea-blue, #0077C8)' : (isPendingAudit ? '#7c3aed' : '#cbd5e1') }} />
@@ -3381,9 +3432,9 @@ const Dashboard = () => {
                             backgroundColor: isAuditConfirmed ? 'var(--saea-blue, #0077C8)' : (isPendingAudit ? '#7c3aed' : '#94a3b8'),
                             color: '#fff'
                           }}>3</div>
-                          <span style={styles.timelineLabel}>감사실 검증</span>
+                          <span style={styles.timelineLabel}>{isEn ? 'Audit Review' : '감사실 검증'}</span>
                           <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', whiteSpace: 'nowrap' }}>
-                            {isPendingAudit ? '검증 진행중' : (isAuditConfirmed ? '검증 완료' : '-')}
+                            {isPendingAudit ? (isEn ? 'In progress' : '검증 진행중') : (isAuditConfirmed ? (isEn ? 'Verified' : '검증 완료') : '-')}
                           </span>
                         </div>
                         <div style={{ ...styles.timelineLine, backgroundColor: isAuditConfirmed ? '#059669' : '#cbd5e1' }} />
@@ -3393,9 +3444,9 @@ const Dashboard = () => {
                             backgroundColor: isAuditConfirmed ? '#059669' : '#94a3b8',
                             color: '#fff'
                           }}>4</div>
-                          <span style={styles.timelineLabel}>조치종료</span>
+                          <span style={styles.timelineLabel}>{isEn ? 'Closed' : '조치종료'}</span>
                           <span style={{ fontSize: '10px', color: '#64748b', marginTop: '2px', whiteSpace: 'nowrap' }}>
-                            {f.auditReviewedAt ? new Date(f.auditReviewedAt).toLocaleDateString() : (isAuditConfirmed ? '완료' : '-')}
+                            {f.auditReviewedAt ? new Date(f.auditReviewedAt).toLocaleDateString() : (isAuditConfirmed ? (isEn ? 'Closed' : '완료') : '-')}
                           </span>
                         </div>
                       </div>
@@ -3403,20 +3454,22 @@ const Dashboard = () => {
                       {/* 반려 및 재수정/재작성 요청 사유 배너 */}
                       {(f.rejectedReason || isRejected) && (
                         <div style={styles.rejectNoticeBox}>
-                          <strong>※ {isRejectedLead ? '대표담당자 재수정 요청 사유' : (isRejectedAudit ? '감사실 재작성(보완) 요청 사유' : '반려 사유')}:</strong> {f.rejectedReason || '보완 요청 사항을 확인 후 조치내역을 수정하세요.'}
+                          <strong>※ {isEn ? (isRejectedLead ? 'Rep. Revision Request Reason' : (isRejectedAudit ? 'Audit Revision Request Reason' : 'Rejection Reason')) : (isRejectedLead ? '대표담당자 재수정 요청 사유' : (isRejectedAudit ? '감사실 재작성(보완) 요청 사유' : '반려 사유'))}:</strong> {f.rejectedReason || (isEn ? 'Please check requested items and update action details.' : '보완 요청 사항을 확인 후 조치내역을 수정하세요.')}
                           <div style={{ fontSize: '11px', marginTop: '3px', color: '#991b1b' }}>
-                            발견사항에 대한 개선 조치를 보완/수정한 후 다시 [조치내역 임시저장] ➔ [CONFIRM (제출)]을 진행하세요.
+                            {isEn 
+                              ? 'Please revise the action plan according to the request and click [Save Draft] ➔ [CONFIRM (Submit)].'
+                              : '발견사항에 대한 개선 조치를 보완/수정한 후 다시 [조치내역 임시저장] ➔ [CONFIRM (제출)]을 진행하세요.'}
                           </div>
                         </div>
                       )}
 
                       <div style={styles.infoGrid}>
-                        <p><strong>소속 법인:</strong> {f.project?.corpId}</p>
-                        <p><strong>프로젝트명:</strong> {f.project?.projectName}</p>
+                        <p><strong>{isEn ? 'Corp:' : '소속 법인:'}</strong> {f.project?.corpId}</p>
+                        <p><strong>{isEn ? 'Project Name:' : '프로젝트명:'}</strong> {f.project?.projectName}</p>
                         <div>
-                          <strong>CAP 달성 대상자:</strong>{' '}
+                          <strong>{isEn ? 'Assignee:' : 'CAP 달성 대상자:'}</strong>{' '}
                           {(() => {
-                            if (!f.assignedUserId) return <span style={{ color: '#94a3b8' }}>미지정</span>;
+                            if (!f.assignedUserId) return <span style={{ color: '#94a3b8' }}>{isEn ? 'Unassigned' : '미지정'}</span>;
                             const ids = f.assignedUserId.split(',').map(s => s.trim()).filter(Boolean);
                             return ids.map(id => {
                               const found = usersList.find(u => u.username === id);
@@ -3436,7 +3489,7 @@ const Dashboard = () => {
                         </div>
                         {f.relatedDepts && (
                           <div style={{ gridColumn: 'span 2' }}>
-                            <strong>유관부서 및 협조 담당자:</strong>{' '}
+                            <strong>{isEn ? 'Related Depts & Assignees:' : '유관부서 및 협조 담당자:'}</strong>{' '}
                             {f.relatedDepts.split(',').map((item, idx) => (
                               <span key={idx} style={{ display: 'inline-block', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', marginRight: '4px', fontWeight: 'bold' }}>
                                 {item.trim()}
@@ -3444,18 +3497,20 @@ const Dashboard = () => {
                             ))}
                           </div>
                         )}
-                        <p><strong>감사팀 예상 마감일:</strong> <span style={{ color: '#2563eb', fontWeight: 'bold' }}>{expDeadlineText}</span></p>
-                        <p><strong>개선 예상 시기:</strong> <span style={{ color: '#16a34a', fontWeight: 'bold' }}>{currentActionDeadline || '미설정'}</span></p>
-                        <p><strong>조치 상태:</strong> <span style={{ fontWeight: 'bold' }}>
-                          {currentActionStatusCode === 'COMPLETED' ? '개선완료' : (currentActionStatusCode === 'IN_PROGRESS' ? '개선중' : (currentActionStatusCode === 'ACTION_IMPOSSIBLE' ? '개선불가' : (currentActionStatusCode === 'CONTINUOUS_MANAGEMENT' ? '업무개선 후 지속관리' : '미작성')))}
+                        <p><strong>{isEn ? 'Audit Due Date:' : '감사팀 예상 마감일:'}</strong> <span style={{ color: '#2563eb', fontWeight: 'bold' }}>{expDeadlineText}</span></p>
+                        <p><strong>{isEn ? 'Target Date:' : '개선 예상 시기:'}</strong> <span style={{ color: '#16a34a', fontWeight: 'bold' }}>{currentActionDeadline || (isEn ? 'Not set' : '미설정')}</span></p>
+                        <p><strong>{isEn ? 'Action Status:' : '조치 상태:'}</strong> <span style={{ fontWeight: 'bold' }}>
+                          {isEn 
+                            ? (currentActionStatusCode === 'COMPLETED' ? 'Completed' : (currentActionStatusCode === 'IN_PROGRESS' ? 'In Progress' : (currentActionStatusCode === 'ACTION_IMPOSSIBLE' ? 'Impossible' : (currentActionStatusCode === 'CONTINUOUS_MANAGEMENT' ? 'Continuous Management' : 'Draft'))))
+                            : (currentActionStatusCode === 'COMPLETED' ? '개선완료' : (currentActionStatusCode === 'IN_PROGRESS' ? '개선중' : (currentActionStatusCode === 'ACTION_IMPOSSIBLE' ? '개선불가' : (currentActionStatusCode === 'CONTINUOUS_MANAGEMENT' ? '업무개선 후 지속관리' : '미작성'))))}
                         </span></p>
                         {currentCompletionDate && (
-                          <p><strong>개선완료일자:</strong> <span style={{ color: '#059669', fontWeight: 'bold' }}>{currentCompletionDate}</span></p>
+                          <p><strong>{isEn ? 'Completion Date:' : '개선완료일자:'}</strong> <span style={{ color: '#059669', fontWeight: 'bold' }}>{currentCompletionDate}</span></p>
                         )}
                       </div>
 
                       <div style={styles.descBox}>
-                        <strong>감사 발견사항 내용:</strong>
+                        <strong>{isEn ? 'Audit Finding Content:' : '감사 발견사항 내용:'}</strong>
                         <div
                           dangerouslySetInnerHTML={{ __html: f.findingText }}
                           style={{ marginTop: '5px', lineHeight: '1.6' }}
@@ -3464,12 +3519,14 @@ const Dashboard = () => {
 
                       {/* 조치 기술 입력 폼 */}
                       <div style={styles.actionContainer}>
-                        <strong>조치내역 및 개선 계획 입력</strong>
+                        <strong>{isEn ? 'Enter Action Plan & Implementation' : '조치내역 및 개선 계획 입력'}</strong>
 
                         {/* 조치 상태 구분 및 마감일자/완료일자 설정 바 */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', margin: '12px 0', flexWrap: 'wrap', backgroundColor: '#f8fafc', padding: '12px 16px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155' }}>조치 상태 구분:</label>
+                            <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155' }}>
+                              {isEn ? 'Action Status:' : '조치 상태 구분:'}
+                            </label>
                             <select
                               value={currentActionStatusCode}
                               onChange={(e) => {
@@ -3482,17 +3539,17 @@ const Dashboard = () => {
                               disabled={f.project?.projectState === 'FREEZE' || isAuditConfirmed || isPendingAudit}
                               style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: (isPendingAudit || isAuditConfirmed) ? '#f1f5f9' : '#fff', fontWeight: 'bold' }}
                             >
-                              <option value="NOT_WRITTEN">미작성 (답변 미작성)</option>
-                              <option value="IN_PROGRESS">개선중 ('개선 예상 시기' 필수)</option>
-                              <option value="COMPLETED">개선완료 ('개선완료일자' 필수)</option>
-                              <option value="ACTION_IMPOSSIBLE">개선불가 (리스크 수용)</option>
-                              <option value="CONTINUOUS_MANAGEMENT">업무개선 후 지속관리</option>
+                              <option value="NOT_WRITTEN">{isEn ? 'Draft (No response yet)' : '미작성 (답변 미작성)'}</option>
+                              <option value="IN_PROGRESS">{isEn ? "In Progress ('Target Date' required)" : "개선중 ('개선 예상 시기' 필수)"}</option>
+                              <option value="COMPLETED">{isEn ? "Completed ('Completion Date' required)" : "개선완료 ('개선완료일자' 필수)"}</option>
+                              <option value="ACTION_IMPOSSIBLE">{isEn ? 'Impossible (Risk accepted)' : '개선불가 (리스크 수용)'}</option>
+                              <option value="CONTINUOUS_MANAGEMENT">{isEn ? 'Continuous Management' : '업무개선 후 지속관리'}</option>
                             </select>
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155' }}>
-                              개선 예상 시기 {currentActionStatusCode === 'IN_PROGRESS' && <span style={{ color: '#ef4444' }}>* (필수)</span>}:
+                              {isEn ? 'Target Date' : '개선 예상 시기'} {currentActionStatusCode === 'IN_PROGRESS' && <span style={{ color: '#ef4444' }}>* ({isEn ? 'Required' : '필수'})</span>}:
                             </label>
                             <input
                               type="date"
@@ -3511,7 +3568,7 @@ const Dashboard = () => {
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155' }}>
-                              개선완료일자 {currentActionStatusCode === 'COMPLETED' && <span style={{ color: '#ef4444' }}>* (필수)</span>}:
+                              {isEn ? 'Completion Date' : '개선완료일자'} {currentActionStatusCode === 'COMPLETED' && <span style={{ color: '#ef4444' }}>* ({isEn ? 'Required' : '필수'})</span>}:
                             </label>
                             <input
                               type="date"
@@ -3528,34 +3585,34 @@ const Dashboard = () => {
                               }}
                             />
                             {currentActionStatusCode === 'COMPLETED' && !currentCompletionDate && (
-                              <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: 'bold' }}>완료일자 필수 기입</span>
+                              <span style={{ fontSize: '11px', color: '#ef4444', fontWeight: 'bold' }}>{isEn ? 'Completion date required' : '완료일자 필수 기입'}</span>
                             )}
                             {(currentActionStatusCode === 'ACTION_IMPOSSIBLE' || currentActionStatusCode === 'CONTINUOUS_MANAGEMENT') && (
-                              <span style={{ fontSize: '11px', color: '#64748b' }}>완료일 기재 불필요</span>
+                              <span style={{ fontSize: '11px', color: '#64748b' }}>{isEn ? 'Date not needed' : '완료일 기재 불필요'}</span>
                             )}
                           </div>
 
                           {isAuditConfirmed && (
                             <span style={{ fontSize: '12px', color: '#1e40af', fontWeight: 'bold', backgroundColor: '#dbeafe', padding: '3px 8px', borderRadius: '4px' }}>
-                              감사 검증 완료 (고정)
+                              {isEn ? 'Audit Verified (Fixed)' : '감사 검증 완료 (고정)'}
                             </span>
                           )}
                           {isPendingAudit && (
                             <span style={{ fontSize: '12px', color: '#6d28d9', fontWeight: 'bold', backgroundColor: '#ede9fe', padding: '3px 8px', borderRadius: '4px' }}>
-                              감사실 제출 완료 (검증 진행 중 - 수정 불가)
+                              {isEn ? 'Submitted to Audit (Under review - read only)' : '감사실 제출 완료 (검증 진행 중 - 수정 불가)'}
                             </span>
                           )}
                         </div>
 
                         <div style={styles.currentAction}>
-                          <strong>현재 등록된 조치내역:</strong>
+                          <strong>{isEn ? 'Currently Registered Action Details:' : '현재 등록된 조치내역:'}</strong>
                           {f.actionText ? (
                             <div
                               dangerouslySetInnerHTML={{ __html: f.actionText }}
                               style={styles.htmlContent}
                             />
                           ) : (
-                            <span style={{ color: '#9ca3af', marginLeft: '5px' }}>등록된 내역이 없습니다.</span>
+                            <span style={{ color: '#9ca3af', marginLeft: '5px' }}>{isEn ? 'No registered content.' : '등록된 내역이 없습니다.'}</span>
                           )}
                         </div>
 
@@ -3565,7 +3622,7 @@ const Dashboard = () => {
                               value={actionInputs[f.findingId] !== undefined ? actionInputs[f.findingId] : (f.actionText || '')}
                               onChange={(val) => setActionInputs({ ...actionInputs, [f.findingId]: val })}
                               disabled={f.project?.projectState === 'FREEZE' || isAuditConfirmed || isPendingAudit}
-                              placeholder="상세 조치 계획 및 실적을 서식으로 입력하세요..."
+                              placeholder={isEn ? 'Enter detailed action plan and achievements...' : '상세 조치 계획 및 실적을 서식으로 입력하세요...'}
                             />
 
                             {/* 버튼 컨트롤 영역 (임시저장 및 단계별 결재 승인 액션) */}
@@ -3576,7 +3633,7 @@ const Dashboard = () => {
                                   onClick={() => handleUpdateAction(f.findingId, f.project?.projectState, f.project?.corpId)}
                                   style={styles.saveBtn}
                                 >
-                                  조치내역 임시저장
+                                  {isEn ? 'Save Draft' : '조치내역 임시저장'}
                                 </button>
                               )}
 
@@ -3586,7 +3643,7 @@ const Dashboard = () => {
                                   onClick={() => handleConfirmMember(f.findingId)}
                                   style={styles.approvalReqBtn}
                                 >
-                                  CONFIRM (법인대표 제출)
+                                  {isEn ? 'CONFIRM (Submit to Rep)' : 'CONFIRM (법인대표 제출)'}
                                 </button>
                               )}
 
@@ -3601,13 +3658,13 @@ const Dashboard = () => {
                                         onClick={() => handleConfirmLead(f.findingId)}
                                         style={{ ...styles.approveActionBtn, backgroundColor: '#0284c7' }}
                                       >
-                                        CONFIRM (감사팀 제출)
+                                        {isEn ? 'CONFIRM (Submit to Audit)' : 'CONFIRM (감사팀 제출)'}
                                       </button>
                                       <button
                                         onClick={() => openRejectModal(f, 'LEAD')}
                                         style={styles.rejectActionBtn}
                                       >
-                                        재수정 요청 (반려)
+                                        {isEn ? 'Request Revision (Reject)' : '재수정 요청 (반려)'}
                                       </button>
                                     </>
                                   )}
@@ -3616,7 +3673,7 @@ const Dashboard = () => {
                                       onClick={() => handleConfirmLead(f.findingId)}
                                       style={{ ...styles.approveActionBtn, backgroundColor: '#0284c7' }}
                                     >
-                                      CONFIRM (감사팀 제출)
+                                      {isEn ? 'CONFIRM (Submit to Audit)' : 'CONFIRM (감사팀 제출)'}
                                     </button>
                                   )}
                                 </div>
@@ -3629,40 +3686,52 @@ const Dashboard = () => {
                                     onClick={() => handleConfirmAudit(f.findingId)}
                                     style={{ ...styles.approveActionBtn, backgroundColor: '#1d4ed8' }}
                                   >
-                                    조치종료 CONFIRM (확인 완료)
+                                    {isEn ? 'CONFIRM Closure (Verified)' : '조치종료 CONFIRM (확인 완료)'}
                                   </button>
                                   <button
                                     onClick={() => openRejectModal(f, 'AUDIT')}
                                     style={{ ...styles.saveBtn, backgroundColor: '#c2410c', color: '#fff' }}
                                   >
-                                    재작성 요청 (보완)
+                                    {isEn ? 'Request Re-draft (Revision)' : '재작성 요청 (보완)'}
                                   </button>
                                 </div>
                               )}
 
                               {isAuditConfirmed && (
                                 <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 'bold' }}>
-                                  ※ 본 발견사항(CAP)은 감사실 최종 검증(CONFIRM)이 완료되었습니다.
+                                  {isEn 
+                                    ? '※ This finding (CAP) has been fully verified and closed by Audit team.'
+                                    : '※ 본 발견사항(CAP)은 감사실 최종 검증(CONFIRM)이 완료되었습니다.'}
                                 </span>
                               )}
                             </div>
                           </div>
                         ) : (
-                          <div style={styles.freezeNotice}>※ 본 프로젝트는 최종 결재 승인 완료에 따라 완료(Completion)되어 조치 수정이 불가합니다.</div>
+                          <div style={styles.freezeNotice}>
+                            {isEn 
+                              ? '※ This project is completed (frozen) by final approval and actions cannot be edited.'
+                              : '※ 본 프로젝트는 최종 결재 승인 완료에 따라 완료(Completion)되어 조치 수정이 불가합니다.'}
+                          </div>
                         )}
 
                         {/* 유관부서 지정자 협조 내용 / 의견 추가 박스 */}
                         {!isAuditConfirmed && f.project?.projectState !== 'FREEZE' && (
                           <div style={{ marginTop: '16px', padding: '12px 16px', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                              <strong style={{ fontSize: '13px', color: '#0369a1' }}>유관부서 협조 내용 및 추가 의견 등록</strong>
-                              <span style={{ fontSize: '11px', color: '#0284c7' }}>※ 유관부서 또는 협조자 작성 시 조치내역 및 누적 이력에 즉시 반영됩니다.</span>
+                              <strong style={{ fontSize: '13px', color: '#0369a1' }}>
+                                {isEn ? 'Dept. Cooperation Notes & Additional Opinions' : '유관부서 협조 내용 및 추가 의견 등록'}
+                              </strong>
+                              <span style={{ fontSize: '11px', color: '#0284c7' }}>
+                                {isEn 
+                                  ? '※ Notes written here are immediately reflected in action history.'
+                                  : '※ 유관부서 또는 협조자 작성 시 조치내역 및 누적 이력에 즉시 반영됩니다.'}
+                              </span>
                             </div>
                             <div style={{ display: 'flex', gap: '8px' }}>
                               <textarea
                                 value={deptAdditionalContent}
                                 onChange={(e) => setDeptAdditionalContent(e.target.value)}
-                                placeholder="유관부서 협조 조치 내용 또는 협조 의견을 입력하세요..."
+                                placeholder={isEn ? 'Enter cooperative action notes or opinions...' : '유관부서 협조 조치 내용 또는 협조 의견을 입력하세요...'}
                                 rows={2}
                                 style={{ flex: 1, padding: '8px 10px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px', resize: 'vertical' }}
                               />
@@ -3681,7 +3750,7 @@ const Dashboard = () => {
                                   whiteSpace: 'nowrap'
                                 }}
                               >
-                                협조 내용 추가
+                                {isEn ? 'Add Note' : '협조 내용 추가'}
                               </button>
                             </div>
                           </div>
@@ -3692,18 +3761,20 @@ const Dashboard = () => {
                       <div style={{ marginTop: '24px', borderTop: '2px solid #e2e8f0', paddingTop: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                           <h4 style={{ margin: 0, fontSize: '15px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            조치 및 검토 이력 타임라인
+                            {isEn ? 'Action & Review History Timeline' : '조치 및 검토 이력 타임라인'}
                           </h4>
                           <button
                             onClick={() => fetchFindingHistories(f.findingId)}
                             style={{ fontSize: '12px', padding: '4px 10px', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 'bold' }}
                           >
-                            새로고침
+                            {isEn ? 'Refresh' : '새로고침'}
                           </button>
                         </div>
 
                         {historyLoading ? (
-                          <div style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>이력을 불러오는 중입니다...</div>
+                          <div style={{ padding: '16px', textAlign: 'center', color: '#64748b' }}>
+                            {isEn ? 'Loading history...' : '이력을 불러오는 중입니다...'}
+                          </div>
                         ) : findingHistories && findingHistories.length > 0 ? (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
                             {[...findingHistories].sort((a, b) => {
@@ -3713,17 +3784,17 @@ const Dashboard = () => {
                             }).map((h, idx) => {
                               const getHistoryBadge = (actionType) => {
                                 switch (actionType) {
-                                  case 'SAVE_DRAFT': return { text: '조치 수정 / 임시저장', bg: '#f1f5f9', color: '#475569' };
-                                  case 'UPDATE_ACTION': return { text: '조치 수정 / 임시저장', bg: '#f1f5f9', color: '#475569' };
-                                  case 'CREATE_CAP': return { text: 'CAP 신규 등록', bg: '#eff6ff', color: '#1d4ed8' };
-                                  case 'UPDATE_CAP': return { text: 'CAP 지적사항 수정', bg: '#f1f5f9', color: '#475569' };
-                                  case 'CONFIRM_MEMBER': return { text: '법인담당자 제출', bg: '#fef3c7', color: '#b45309' };
-                                  case 'CONFIRM_LEAD': return { text: '대표담당자 확인 및 제출', bg: '#ede9fe', color: '#6d28d9' };
-                                  case 'REJECT_LEAD': return { text: '대표담당자 재수정요청 (반려)', bg: '#fee2e2', color: '#b91c1c' };
-                                  case 'CONFIRM_AUDIT': return { text: '감사담당자 조치종료 확인 (완료)', bg: '#dbeafe', color: '#1d4ed8' };
-                                  case 'REJECT_AUDIT': return { text: '감사실 재작성 (보완) 요청', bg: '#ffedd5', color: '#c2410c' };
-                                  case 'ADD_DEPT_CONTENT': return { text: '유관부서 협조내용 추가', bg: '#e0f2fe', color: '#0369a1' };
-                                  case 'COPIED_FROM_PARENT': return { text: '이전 차수 승계 건', bg: '#eff6ff', color: '#1d4ed8' };
+                                  case 'SAVE_DRAFT':
+                                  case 'UPDATE_ACTION': return { text: isEn ? 'Save Draft' : '조치 수정 / 임시저장', bg: '#f1f5f9', color: '#475569' };
+                                  case 'CREATE_CAP': return { text: isEn ? 'New CAP' : 'CAP 신규 등록', bg: '#eff6ff', color: '#1d4ed8' };
+                                  case 'UPDATE_CAP': return { text: isEn ? 'Edit CAP' : 'CAP 지적사항 수정', bg: '#f1f5f9', color: '#475569' };
+                                  case 'CONFIRM_MEMBER': return { text: isEn ? 'Submit to Rep' : '법인담당자 제출', bg: '#fef3c7', color: '#b45309' };
+                                  case 'CONFIRM_LEAD': return { text: isEn ? 'Rep Confirmed' : '대표담당자 확인 및 제출', bg: '#ede9fe', color: '#6d28d9' };
+                                  case 'REJECT_LEAD': return { text: isEn ? 'Rep Rejected' : '대표담당자 재수정요청 (반려)', bg: '#fee2e2', color: '#b91c1c' };
+                                  case 'CONFIRM_AUDIT': return { text: isEn ? 'Audit Closed' : '감사담당자 조치종료 확인 (완료)', bg: '#dbeafe', color: '#1d4ed8' };
+                                  case 'REJECT_AUDIT': return { text: isEn ? 'Audit Revision Req.' : '감사실 재작성 (보완) 요청', bg: '#ffedd5', color: '#c2410c' };
+                                  case 'ADD_DEPT_CONTENT': return { text: isEn ? 'Dept Note' : '유관부서 협조내용 추가', bg: '#e0f2fe', color: '#0369a1' };
+                                  case 'COPIED_FROM_PARENT': return { text: isEn ? 'Inherited' : '이전 차수 승계 건', bg: '#eff6ff', color: '#1d4ed8' };
                                   default: return { text: actionType, bg: '#f1f5f9', color: '#334155' };
                                 }
                               };
@@ -3732,17 +3803,28 @@ const Dashboard = () => {
                               const getActionStatusKorean = (code) => {
                                 if (!code) return '';
                                 switch (code.trim().toUpperCase()) {
-                                  case 'NOT_WRITTEN': return '미작성';
-                                  case 'IN_PROGRESS': return '개선중';
-                                  case 'COMPLETED': return '개선완료';
-                                  case 'ACTION_IMPOSSIBLE': return '개선불가';
-                                  case 'CONTINUOUS_MANAGEMENT': return '업무개선 후 지속관리';
+                                  case 'NOT_WRITTEN': return isEn ? 'Draft' : '미작성';
+                                  case 'IN_PROGRESS': return isEn ? 'In Progress' : '개선중';
+                                  case 'COMPLETED': return isEn ? 'Completed' : '개선완료';
+                                  case 'ACTION_IMPOSSIBLE': return isEn ? 'Impossible' : '개선불가';
+                                  case 'CONTINUOUS_MANAGEMENT': return isEn ? 'Continuous' : '업무개선 후 지속관리';
                                   default: return code;
                                 }
                               };
 
                               const formatHistoryComment = (text) => {
                                 if (!text) return '';
+                                if (isEn) {
+                                  return text
+                                    .replace(/IN_PROGRESS/g, 'In Progress')
+                                    .replace(/COMPLETED/g, 'Completed')
+                                    .replace(/ACTION_IMPOSSIBLE/g, 'Impossible')
+                                    .replace(/CONTINUOUS_MANAGEMENT/g, 'Continuous')
+                                    .replace(/NOT_WRITTEN/g, 'Draft')
+                                    .replace(/PENDING_LEAD/g, 'Pending Rep Review')
+                                    .replace(/PENDING_AUDIT/g, 'Pending Audit Review')
+                                    .replace(/AUDIT_CONFIRMED/g, 'Closed');
+                                }
                                 return text
                                   .replace(/IN_PROGRESS/g, '개선중')
                                   .replace(/COMPLETED/g, '개선완료')
@@ -3756,7 +3838,7 @@ const Dashboard = () => {
 
                               const actionTime = h.createdAt || h.actionAt;
                               const formattedDateTime = actionTime
-                                ? new Date(actionTime).toLocaleString('ko-KR', {
+                                ? new Date(actionTime).toLocaleString(isEn ? 'en-US' : 'ko-KR', {
                                     year: 'numeric',
                                     month: '2-digit',
                                     day: '2-digit',
@@ -3797,7 +3879,7 @@ const Dashboard = () => {
                                           color: h.actionStatusCode === 'COMPLETED' ? '#15803d' : (h.actionStatusCode === 'IN_PROGRESS' ? '#b45309' : '#475569'),
                                           border: '1px solid #cbd5e1'
                                         }}>
-                                          상태: {getActionStatusKorean(h.actionStatusCode)}
+                                          {isEn ? 'Status: ' : '상태: '}{getActionStatusKorean(h.actionStatusCode)}
                                         </span>
                                       )}
                                       <strong style={{ fontSize: '13px', color: '#1e293b' }}>{h.actorName || h.actorUserId}</strong>
@@ -3818,14 +3900,14 @@ const Dashboard = () => {
                                       marginBottom: '6px',
                                       border: '1px solid #e2e8f0'
                                     }}>
-                                      <strong>{(h.actionType === 'REJECT_LEAD' || h.actionType === 'REJECT_AUDIT') ? '요청 사유:' : '기록 / 내용:'}</strong> {formatHistoryComment(h.comment)}
+                                      <strong>{(h.actionType === 'REJECT_LEAD' || h.actionType === 'REJECT_AUDIT') ? (isEn ? 'Reason:' : '요청 사유:') : (isEn ? 'Content:' : '기록 / 내용:')}</strong> {formatHistoryComment(h.comment)}
                                     </div>
                                   )}
 
                                   {h.actionTextSnapshot && (
                                     <details style={{ fontSize: '12px', color: '#475569', marginTop: '4px' }}>
                                       <summary style={{ cursor: 'pointer', color: '#0284c7', fontWeight: 'bold' }}>
-                                        당시 조치내용 스냅샷 확인
+                                        {isEn ? 'View action snapshot' : '당시 조치내용 스냅샷 확인'}
                                       </summary>
                                       <div
                                         dangerouslySetInnerHTML={{ __html: h.actionTextSnapshot }}
@@ -3839,7 +3921,7 @@ const Dashboard = () => {
                           </div>
                         ) : (
                           <div style={{ padding: '14px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', backgroundColor: '#f8fafc', borderRadius: '6px' }}>
-                            기록된 조치 및 검토 이력이 없습니다.
+                            {isEn ? 'No recorded action or review history.' : '기록된 조치 및 검토 이력이 없습니다.'}
                           </div>
                         )}
                       </div>
@@ -3855,7 +3937,7 @@ const Dashboard = () => {
                           <div style={styles.uploadContainer}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
                               <strong style={{ fontSize: '14px', color: '#1e293b' }}>
-                                증빙 자료 첨부 및 관리 (최대 50MB, exe/bat 확장자 차단)
+                                {isEn ? 'Attach & Manage Evidence (Max 50MB, exe/bat blocked)' : '증빙 자료 첨부 및 관리 (최대 50MB, exe/bat 확장자 차단)'}
                               </strong>
                               {isUploadDisabled && (
                                 <span style={{
@@ -3868,12 +3950,12 @@ const Dashboard = () => {
                                   border: '1px solid #fecaca'
                                 }}>
                                   {isProjectFrozen
-                                    ? '완료(Completion) 상태'
+                                    ? (isEn ? 'Completed' : '완료(Completion) 상태')
                                     : isAuditConfirmed
-                                      ? '감사 검증완료/종료'
+                                      ? (isEn ? 'Audit Verified/Closed' : '감사 검증완료/종료')
                                       : isPendingAudit
-                                        ? '감사실 제출 완료'
-                                        : '개선불가 상태'}
+                                        ? (isEn ? 'Submitted to Audit' : '감사실 제출 완료')
+                                        : (isEn ? 'Impossible' : '개선불가 상태')}
                                 </span>
                               )}
                             </div>
@@ -3895,14 +3977,14 @@ const Dashboard = () => {
                                     fontSize: '13px'
                                   }}>
                                     <div>
-                                      <b style={{ color: '#475569' }}>증빙자료 파일 선택 및 업로드 차단:</b>{' '}
+                                      <b style={{ color: '#475569' }}>{isEn ? 'Evidence upload disabled:' : '증빙자료 파일 선택 및 업로드 차단:'}</b>{' '}
                                       {isProjectFrozen
-                                        ? '프로젝트가 완료(Completion) 상태이므로 파일 선택 및 추가 업로드가 차단되었습니다.'
+                                        ? (isEn ? 'File selection and upload are disabled because the project is completed.' : '프로젝트가 완료(Completion) 상태이므로 파일 선택 및 추가 업로드가 차단되었습니다.')
                                         : isAuditConfirmed
-                                          ? '감사팀의 최종 검증이 완료/종료되어 파일 선택 및 추가 업로드가 마감되었습니다.'
+                                          ? (isEn ? 'File selection and upload are closed because audit review is completed.' : '감사팀의 최종 검증이 완료/종료되어 파일 선택 및 추가 업로드가 마감되었습니다.')
                                           : isPendingAudit
-                                            ? '감사실에 제출되어 검증이 진행 중이므로 파일 선택 및 추가 업로드가 차단되었습니다.'
-                                            : '개선불가 항목으로 지정되어 파일 선택 및 추가 업로드가 비활성화되었습니다.'}
+                                            ? (isEn ? 'File selection and upload are disabled while audit review is in progress.' : '감사실에 제출되어 검증이 진행 중이므로 파일 선택 및 추가 업로드가 차단되었습니다.')
+                                            : (isEn ? 'File selection and upload are disabled for impossible items.' : '개선불가 항목으로 지정되어 파일 선택 및 추가 업로드가 비활성화되었습니다.')}
                                     </div>
                                   </div>
                                 );
@@ -3936,7 +4018,7 @@ const Dashboard = () => {
                                         whiteSpace: 'nowrap'
                                       }}
                                     >
-                                      📤 {hasFiles ? `${selectedList.length}개 파일 일괄 업로드` : '증빙 파일 업로드'}
+                                      📤 {hasFiles ? (isEn ? `Upload ${selectedList.length} files` : `${selectedList.length}개 파일 일괄 업로드`) : (isEn ? 'Upload Evidence Files' : '증빙 파일 업로드')}
                                     </button>
                                   </div>
 
@@ -3955,7 +4037,7 @@ const Dashboard = () => {
                                       gap: '4px'
                                     }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <strong>📑 업로드 대기 중인 파일 ({selectedList.length}개):</strong>
+                                        <strong>📑 {isEn ? `Files waiting to upload (${selectedList.length}):` : `업로드 대기 중인 파일 (${selectedList.length}개):`}</strong>
                                         <button
                                           type="button"
                                           onClick={() => {
@@ -3965,7 +4047,7 @@ const Dashboard = () => {
                                           }}
                                           style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}
                                         >
-                                          ✕ 선택 취소
+                                          ✕ {isEn ? 'Clear' : '선택 취소'}
                                         </button>
                                       </div>
                                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
@@ -3995,19 +4077,21 @@ const Dashboard = () => {
                             <div style={{ marginTop: '16px', borderTop: '1px dashed #cbd5e1', paddingTop: '12px' }}>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                                 <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#334155' }}>
-                                  📎 등록된 증빙 자료 ({currentAttachments.length}건)
+                                  📎 {isEn ? `Registered Evidence Files (${currentAttachments.length})` : `등록된 증빙 자료 (${currentAttachments.length}건)`}
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => fetchFindingAttachments(f.findingId)}
                                   style={{ fontSize: '11px', padding: '2px 8px', border: '1px solid #cbd5e1', borderRadius: '4px', backgroundColor: '#fff', cursor: 'pointer', fontWeight: 'bold' }}
                                 >
-                                  🔄 목록 새로고침
+                                  🔄 {isEn ? 'Refresh' : '목록 새로고침'}
                                 </button>
                               </div>
 
                               {attachmentLoading && currentAttachments.length === 0 ? (
-                                <div style={{ fontSize: '12px', color: '#64748b', padding: '10px', textAlign: 'center' }}>증빙 파일 목록을 불러오는 중...</div>
+                                <div style={{ fontSize: '12px', color: '#64748b', padding: '10px', textAlign: 'center' }}>
+                                  {isEn ? 'Loading evidence files...' : '증빙 파일 목록을 불러오는 중...'}
+                                </div>
                               ) : currentAttachments.length > 0 ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                   {currentAttachments.map((att) => {
@@ -4043,7 +4127,7 @@ const Dashboard = () => {
                                             ({formatBytes(att.fileSize)})
                                           </span>
                                           <span style={{ color: '#94a3b8', fontSize: '11px' }}>
-                                            • {att.uploadedBy} • {att.uploadedAt ? new Date(att.uploadedAt).toLocaleString() : ''}
+                                            • {att.uploadedBy} • {att.uploadedAt ? new Date(att.uploadedAt).toLocaleString(isEn ? 'en-US' : 'ko-KR') : ''}
                                           </span>
                                         </div>
 
@@ -4062,7 +4146,7 @@ const Dashboard = () => {
                                               cursor: 'pointer'
                                             }}
                                           >
-                                            ⬇️ 다운로드
+                                            ⬇️ {isEn ? 'Download' : '다운로드'}
                                           </button>
                                           {!isUploadDisabled && (
                                             <button
@@ -4079,7 +4163,7 @@ const Dashboard = () => {
                                                 cursor: 'pointer'
                                               }}
                                             >
-                                              🗑️ 삭제
+                                              🗑️ {isEn ? 'Delete' : '삭제'}
                                             </button>
                                           )}
                                         </div>
@@ -4089,7 +4173,7 @@ const Dashboard = () => {
                                 </div>
                               ) : (
                                 <div style={{ fontSize: '12px', color: '#94a3b8', padding: '12px', textAlign: 'center', backgroundColor: '#f8fafc', borderRadius: '4px', border: '1px dashed #e2e8f0' }}>
-                                  현재 등록된 증빙 자료가 없습니다.
+                                  {isEn ? 'No evidence files registered.' : '현재 등록된 증빙 자료가 없습니다.'}
                                 </div>
                               )}
                             </div>
@@ -4099,7 +4183,9 @@ const Dashboard = () => {
                     </div>
                   );
                 })() : (
-                  <div style={styles.noDataBox}>상단 그리드에서 감사 지적 항목을 선택해 주세요.</div>
+                  <div style={styles.noDataBox}>
+                    {isEn ? 'Please select an audit finding from the table above.' : '상단 그리드에서 감사 지적 항목을 선택해 주세요.'}
+                  </div>
                 )}
               </div>
             );
@@ -4165,10 +4251,12 @@ const Dashboard = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
                     <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '12px' }}>
                       <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b', fontWeight: 'bold' }}>
-                        감사 지적사항 (CAP) 관리 및 등록
+                        {t('tabFindingTitle', '감사 지적사항 (CAP) 관리')}
                       </h3>
                       <span style={{ fontSize: '12.5px', color: '#64748b' }}>
-                        감사 프로젝트별 지적사항을 등록 및 수정하고, 감사팀 마감기한을 관리합니다.
+                        {isEn 
+                          ? 'Register/edit findings by audit project and manage audit deadlines.' 
+                          : '감사 프로젝트별 지적사항을 등록 및 수정하고, 감사팀 마감기한을 관리합니다.'}
                       </span>
                     </div>
                     {/* 카테고리 관리 버튼 */}
@@ -4191,7 +4279,7 @@ const Dashboard = () => {
                         whiteSpace: 'nowrap'
                       }}
                     >
-                      분류 카테고리 관리
+                      {isEn ? 'Manage Categories' : '분류 카테고리 관리'}
                     </button>
                   </div>
 
@@ -4208,7 +4296,7 @@ const Dashboard = () => {
                     flexWrap: 'wrap',
                   }}>
                     <label style={{ margin: 0, fontSize: '13px', fontWeight: 'bold', color: '#1e293b', whiteSpace: 'nowrap' }}>
-                      대상 감사 프로젝트 선택 <span style={{ color: '#ef4444' }}>*</span>
+                      {isEn ? 'Select Audit Project' : '대상 감사 프로젝트 선택'} <span style={{ color: '#ef4444' }}>*</span>
                     </label>
 
                     <select
@@ -4222,10 +4310,10 @@ const Dashboard = () => {
                       style={{ ...styles.select, flex: 1, minWidth: '300px', margin: 0, padding: '7px 10px', fontSize: '13px' }}
                       required
                     >
-                      <option value="">-- 대상 프로젝트를 선택하세요 --</option>
+                      <option value="">{isEn ? '-- Select Target Project --' : '-- 대상 프로젝트를 선택하세요 --'}</option>
                       {selectableProjects.map(p => (
                         <option key={p.projectId} value={p.projectId}>
-                          {p.projectName} {p.round && p.round > 1 ? `[${p.round}차: ${p.parentProjectName || ''} 연계]` : ''} [{p.projectState === 'FREEZE' ? '완료(Completion)' : 'OPEN'}] ({p.corpId})
+                          {p.projectName} {p.round && p.round > 1 ? `[${p.round}${isEn ? ' Round' : '차'}: ${p.parentProjectName || ''}]` : ''} [{p.projectState === 'FREEZE' ? (isEn ? 'Completed' : '완료(Completion)') : 'OPEN'}] ({p.corpId})
                         </option>
                       ))}
                     </select>
@@ -4243,7 +4331,7 @@ const Dashboard = () => {
                           }
                         }}
                       />
-                      <span>완료(Completion) 포함</span>
+                      <span>{isEn ? 'Include Completed' : '완료(Completion) 포함'}</span>
                     </label>
                   </div>
 
@@ -4258,7 +4346,9 @@ const Dashboard = () => {
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
                         <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>
-                          해당 프로젝트 등록 지적사항 (CAP) 선택 ({projectCaps.length}건 등록됨)
+                          {isEn 
+                            ? `Select Registered CAPs (${projectCaps.length} registered)` 
+                            : `해당 프로젝트 등록 지적사항 (CAP) 선택 (${projectCaps.length}건 등록됨)`}
                         </div>
                         <button
                           type="button"
@@ -4282,13 +4372,17 @@ const Dashboard = () => {
                             transition: 'all 0.15s ease'
                           }}
                         >
-                          {selectedCapId === null ? `✔ CAP #${nextCapDisplayNum} 신규 등록 모드 활성` : `+ CAP #${nextCapDisplayNum} 신규 지적사항 등록`}
+                          {selectedCapId === null 
+                            ? (isEn ? `✔ CAP #${nextCapDisplayNum} New Reg. Active` : `✔ CAP #${nextCapDisplayNum} 신규 등록 모드 활성`) 
+                            : (isEn ? `+ CAP #${nextCapDisplayNum} New Finding` : `+ CAP #${nextCapDisplayNum} 신규 지적사항 등록`)}
                         </button>
                       </div>
 
                       {projectCaps.length === 0 && (
                         <div style={{ fontSize: '12.5px', color: '#166534', backgroundColor: '#f0fdf4', padding: '8px 12px', borderRadius: '6px', border: '1px solid #bbf7d0', marginBottom: '8px' }}>
-                          ※ 본 프로젝트에 기존 등록된 지적사항이 없습니다. 아래 <b>CAP #1</b> 카드를 작성하여 첫 번째 지적사항을 등록하세요.
+                          {isEn 
+                            ? <>※ No findings registered in this project. Please fill out <b>CAP #1</b> below to register.</>
+                            : <>※ 본 프로젝트에 기존 등록된 지적사항이 없습니다. 아래 <b>CAP #1</b> 카드를 작성하여 첫 번째 지적사항을 등록하세요.</>}
                         </div>
                       )}
 
@@ -4308,25 +4402,25 @@ const Dashboard = () => {
                           // 직관적이고 선명한 CAP 진행 상태 뱃지
                           const getStatusBadge = () => {
                             if (cap.project?.projectState === 'FREEZE') {
-                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#334155', color: '#ffffff' }}>완료(Completion)</span>;
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#334155', color: '#ffffff' }}>{isEn ? 'Completed' : '완료(Completion)'}</span>;
                             }
                             const st = cap.approvalStatus || 'DRAFT';
                             if (st === 'APPROVED') {
-                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }}>승인 완료</span>;
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }}>{isEn ? 'Approved' : '승인 완료'}</span>;
                             }
                             if (st === 'REJECTED') {
-                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}>반려</span>;
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}>{isEn ? 'Rejected' : '반려'}</span>;
                             }
                             if (st === 'PENDING_APPROVER') {
-                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#ffedd5', color: '#c2410c', border: '1px solid #fdba74' }}>최종승인 대기</span>;
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#ffedd5', color: '#c2410c', border: '1px solid #fdba74' }}>{isEn ? 'Pending Final' : '최종승인 대기'}</span>;
                             }
                             if (st === 'PENDING_AUDITOR') {
-                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#f3e8ff', color: '#7e22ce', border: '1px solid #d8b4fe' }}>감사팀 검토중</span>;
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#f3e8ff', color: '#7e22ce', border: '1px solid #d8b4fe' }}>{isEn ? 'Under Review' : '감사팀 검토중'}</span>;
                             }
                             if (hasAct) {
-                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc' }}>조치작성 완료</span>;
+                              return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc' }}>{isEn ? 'Action Submitted' : '조치작성 완료'}</span>;
                             }
-                            return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>조치 대기</span>;
+                            return <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>{isEn ? 'Pending Action' : '조치 대기'}</span>;
                           };
 
                           return (
@@ -4389,16 +4483,16 @@ const Dashboard = () => {
                                 color: selectedCapId === null ? '#15803d' : '#64748b',
                                 border: selectedCapId === null ? '1px solid #86efac' : '1px solid #cbd5e1'
                               }}>
-                                {selectedCapId === null ? '신규 등록 중' : '+ 신규 추가'}
+                                {selectedCapId === null ? (isEn ? 'Registering' : '신규 등록 중') : (isEn ? '+ Add New' : '+ 신규 추가')}
                               </span>
                             </div>
                             <div style={{ fontSize: '13px', fontWeight: 'bold', color: selectedCapId === null ? '#166534' : '#64748b', marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {selectedCapId === null && newTitle.trim() ? newTitle : '(신규 지적사항 작성)'}
+                              {selectedCapId === null && newTitle.trim() ? newTitle : (isEn ? '(Draft New Finding)' : '(신규 지적사항 작성)')}
                             </div>
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
                             <span style={{ fontSize: '11px', fontWeight: 'bold', color: selectedCapId === null ? '#16a34a' : '#94a3b8' }}>
-                              {selectedCapId === null ? '● 현재 입력 모드' : '클릭 시 신규 등록'}
+                              {selectedCapId === null ? (isEn ? '● Current Input' : '● 현재 입력 모드') : (isEn ? 'Click to register' : '클릭 시 신규 등록')}
                             </span>
                           </div>
                         </div>
@@ -4421,8 +4515,8 @@ const Dashboard = () => {
                         borderRadius: '6px'
                       }}>
                         {isProjectFrozen
-                          ? '※ 본 프로젝트는 최종 승인 완료로 완료(Completion) 상태이므로 지적사항을 수정할 수 없습니다 (읽기 전용).'
-                          : '※ 본 지적사항은 이미 조치 작성 또는 결재 진행 중이므로 내용을 수정할 수 없습니다 (읽기 전용).'}
+                          ? (isEn ? '※ This project is completed and findings cannot be edited (Read-only).' : '※ 본 프로젝트는 최종 승인 완료로 완료(Completion) 상태이므로 지적사항을 수정할 수 없습니다 (읽기 전용).')
+                          : (isEn ? '※ This finding is under action or approval process and cannot be edited (Read-only).' : '※ 본 지적사항은 이미 조치 작성 또는 결재 진행 중이므로 내용을 수정할 수 없습니다 (읽기 전용).')}
                       </div>
                     )}
 
@@ -4441,10 +4535,10 @@ const Dashboard = () => {
                                 color: '#1d4ed8',
                                 border: '1px solid #bfdbfe'
                               }}>
-                                {canEditCurrentCap ? '수정 모드' : '상세 조회'}
+                                {canEditCurrentCap ? (isEn ? 'Edit Mode' : '수정 모드') : (isEn ? 'View Details' : '상세 조회')}
                               </span>
                               <h4 style={{ margin: 0, fontSize: '15px', color: '#1e293b' }}>
-                                지적사항 (CAP #{selectedCapDisplayNum}) {canEditCurrentCap ? '내용 수정' : '상세 조회'}
+                                {isEn ? `Finding (CAP #${selectedCapDisplayNum}) ${canEditCurrentCap ? 'Content Edit' : 'Details'}` : `지적사항 (CAP #${selectedCapDisplayNum}) ${canEditCurrentCap ? '내용 수정' : '상세 조회'}`}
                               </h4>
                             </>
                           ) : (
@@ -4458,10 +4552,10 @@ const Dashboard = () => {
                                 color: '#15803d',
                                 border: '1px solid #86efac'
                               }}>
-                                신규 등록 모드
+                                {isEn ? 'New Reg. Mode' : '신규 등록 모드'}
                               </span>
                               <h4 style={{ margin: 0, fontSize: '15px', color: '#15803d', fontWeight: 'bold' }}>
-                                지적사항 (CAP #{nextCapDisplayNum}) 신규 등록 입력
+                                {isEn ? `Finding (CAP #${nextCapDisplayNum}) New Registration` : `지적사항 (CAP #${nextCapDisplayNum}) 신규 등록 입력`}
                               </h4>
                             </>
                           )}
@@ -4480,7 +4574,7 @@ const Dashboard = () => {
                               textDecoration: 'underline'
                             }}
                           >
-                            + CAP #{nextCapDisplayNum} 신규 등록 모드로 전환
+                            {isEn ? `+ Switch to CAP #${nextCapDisplayNum} New Reg.` : `+ CAP #${nextCapDisplayNum} 신규 등록 모드로 전환`}
                           </button>
                         )}
                       </div>
@@ -4488,7 +4582,9 @@ const Dashboard = () => {
                       <div style={styles.dateRow}>
                       {/* 1) 분류 카테고리 (기존 데이터 목록 + 직접 입력 지원) */}
                       <div style={{ ...styles.formGroup, flex: 1 }}>
-                        <label style={styles.formLabel}>분류 카테고리 <span style={{ color: '#ef4444' }}>*</span></label>
+                        <label style={styles.formLabel}>
+                          {isEn ? 'Category' : '분류 카테고리'} <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
                         <select
                           value={newCategory}
                           onChange={(e) => {
@@ -4502,13 +4598,13 @@ const Dashboard = () => {
                           disabled={selectedCapId && !canEditCurrentCap}
                           required
                         >
-                          <option value="">-- 분류 카테고리 선택 --</option>
+                          <option value="">{isEn ? '-- Select Category --' : '-- 분류 카테고리 선택 --'}</option>
                           {existingCatNames.map(name => (
                             <option key={name} value={name}>
                               {name}
                             </option>
                           ))}
-                          <option value="__NEW__">신규 카테고리 직접 입력...</option>
+                          <option value="__NEW__">{isEn ? 'Enter new category directly...' : '신규 카테고리 직접 입력...'}</option>
                         </select>
                         {newCategory === '__NEW__' && (
                           <div style={{ marginTop: '6px' }}>
@@ -4516,7 +4612,7 @@ const Dashboard = () => {
                               type="text"
                               value={customCategoryInput}
                               onChange={(e) => setCustomCategoryInput(e.target.value)}
-                              placeholder="신규 카테고리명을 직접 입력하세요"
+                              placeholder={isEn ? 'Enter new category name directly' : '신규 카테고리명을 직접 입력하세요'}
                               required
                               disabled={selectedCapId && !canEditCurrentCap}
                               style={{
@@ -4532,14 +4628,16 @@ const Dashboard = () => {
 
                       {/* 발견사항 세부 제목 */}
                       <div style={{ ...styles.formGroup, flex: 3 }}>
-                        <label style={styles.formLabel}>발견사항 세부 제목 <span style={{ color: '#ef4444' }}>*</span></label>
+                        <label style={styles.formLabel}>
+                          {isEn ? 'Finding Title' : '발견사항 세부 제목'} <span style={{ color: '#ef4444' }}>*</span>
+                        </label>
                         <input
                           type="text"
                           value={newTitle}
                           onChange={(e) => setNewTitle(e.target.value)}
                           required
                           disabled={selectedCapId && !canEditCurrentCap}
-                          placeholder="발견사항 핵심 요약 제목을 입력하세요"
+                          placeholder={isEn ? 'Enter finding summary title' : '발견사항 핵심 요약 제목을 입력하세요'}
                           style={styles.input}
                         />
                       </div>
@@ -4547,12 +4645,14 @@ const Dashboard = () => {
 
                     {/* 발견사항 기술 내용 */}
                     <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>발견사항 기술 내용</label>
+                      <label style={styles.formLabel}>
+                        {isEn ? 'Finding Description' : '발견사항 기술 내용'}
+                      </label>
                       <HtmlEditor
                         value={newFindingText}
                         onChange={setNewFindingText}
                         disabled={selectedCapId && !canEditCurrentCap}
-                        placeholder="발견사항 상세 기술 내용을 서식으로 작성하세요..."
+                        placeholder={isEn ? 'Write detailed finding description with formatting...' : '발견사항 상세 기술 내용을 서식으로 작성하세요...'}
                       />
                     </div>
 
@@ -4568,14 +4668,16 @@ const Dashboard = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#166534' }}>
-                            CAP 달성 대상자 지정 {targetCorpId ? `(소속 법인: ${targetCorpId})` : '(대상 프로젝트 선택 필요)'}
+                            {isEn ? 'Assign CAP Assignees' : 'CAP 달성 대상자 지정'} {targetCorpId ? (isEn ? `(Corp: ${targetCorpId})` : `(소속 법인: ${targetCorpId})`) : (isEn ? '(Target project required)' : '(대상 프로젝트 선택 필요)')}
                           </span>
                           <span style={{ fontSize: '12px', fontWeight: 'bold', backgroundColor: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '12px', border: '1px solid #86efac' }}>
-                            {selectedAssignedUsers.length}명 지정됨
+                            {selectedAssignedUsers.length}{isEn ? ' assigned' : '명 지정됨'}
                           </span>
                         </div>
                         <span style={{ fontSize: '12px', color: '#15803d', fontWeight: '500' }}>
-                          ※ 프로젝트 생성 시 지정된 소속법인 사용자가 자동으로 불러와집니다. 필요 시 [✕]로 삭제하거나 아래에서 추가할 수 있습니다.
+                          {isEn 
+                            ? '※ Corp users assigned during project creation are loaded automatically. Use [✕] to remove or add below if needed.' 
+                            : '※ 프로젝트 생성 시 지정된 소속법인 사용자가 자동으로 불러와집니다. 필요 시 [✕]로 삭제하거나 아래에서 추가할 수 있습니다.'}
                         </span>
                       </div>
 
@@ -4583,7 +4685,9 @@ const Dashboard = () => {
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px', minHeight: '34px', alignItems: 'center', backgroundColor: '#ffffff', padding: '8px 12px', borderRadius: '6px', border: '1px dashed #86efac' }}>
                         {selectedAssignedUsers.length === 0 ? (
                           <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                            지정된 CAP 달성 대상자가 없습니다. 아래 1단계(부서), 2단계(담당자)를 선택 후 [대상자 추가] 버튼을 눌러주세요.
+                            {isEn 
+                              ? 'No assignees designated yet. Select Step 1 (Dept) & Step 2 (Member) below, then click [Add Assignee].' 
+                              : '지정된 CAP 달성 대상자가 없습니다. 아래 1단계(부서), 2단계(담당자)를 선택 후 [대상자 추가] 버튼을 눌러주세요.'}
                           </span>
                         ) : (
                           selectedAssignedUsers.map(u => (
@@ -4603,7 +4707,7 @@ const Dashboard = () => {
                                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                               }}
                             >
-                              <span>{u.name || u.userId} (사번: {u.userId}){u.deptName ? ` [${u.deptName}]` : ''}</span>
+                              <span>{u.name || u.userId} ({isEn ? 'ID: ' : '사번: '}{u.userId}){u.deptName ? ` [${u.deptName}]` : ''}</span>
                               {(!selectedCapId || canEditCurrentCap || isAuditTeam) && (
                                 <button
                                   type="button"
@@ -4618,7 +4722,7 @@ const Dashboard = () => {
                                     padding: '0 2px',
                                     lineHeight: 1
                                   }}
-                                  title="대상자 제거"
+                                  title={isEn ? 'Remove assignee' : '대상자 제거'}
                                 >
                                   ✕
                                 </button>
@@ -4643,7 +4747,7 @@ const Dashboard = () => {
                           {/* 1단계: 소속 부서 선택 */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 240px' }}>
                             <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#166534', marginBottom: 0 }}>
-                              1단계: 소속 부서 선택
+                              {isEn ? 'Step 1: Select Department' : '1단계: 소속 부서 선택'}
                             </label>
                             <select
                               value={assignedDeptSelect}
@@ -4653,11 +4757,11 @@ const Dashboard = () => {
                               }}
                               style={{ ...styles.select, fontSize: '12px', padding: '6px 8px', borderColor: '#86efac' }}
                             >
-                              <option value="">-- 부서 선택 ({targetCorpDepts.length}개) --</option>
-                              <option value="__ALL__">-- [전체 부서] 담당자 목록에서 바로 선택 ({targetCorpUsers.length}명) --</option>
+                              <option value="">{isEn ? `-- Select Dept (${targetCorpDepts.length}) --` : `-- 부서 선택 (${targetCorpDepts.length}개) --`}</option>
+                              <option value="__ALL__">{isEn ? `-- [All Depts] Select from full list (${targetCorpUsers.length}) --` : `-- [전체 부서] 담당자 목록에서 바로 선택 (${targetCorpUsers.length}명) --`}</option>
                               {targetCorpDepts.map(d => (
                                 <option key={d} value={d}>
-                                  {d} ({targetCorpUsers.filter(u => u.deptName === d).length}명)
+                                  {d} ({targetCorpUsers.filter(u => u.deptName === d).length}{isEn ? ' users' : '명'})
                                 </option>
                               ))}
                             </select>
@@ -4666,7 +4770,7 @@ const Dashboard = () => {
                           {/* 2단계: 담당자 선택 (선택된 부서 소속 직원만 표시) */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 280px' }}>
                             <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#166534', marginBottom: 0 }}>
-                              2단계: 담당자 선택
+                              {isEn ? 'Step 2: Select Assignee' : '2단계: 담당자 선택'}
                             </label>
                             {(() => {
                               const deptUsers = assignedDeptSelect === '__ALL__'
@@ -4687,15 +4791,15 @@ const Dashboard = () => {
                                   }}
                                 >
                                   {!assignedDeptSelect ? (
-                                    <option value="">-- 먼저 1단계 부서를 선택해 주세요 --</option>
+                                    <option value="">{isEn ? '-- Select Step 1 Dept first --' : '-- 먼저 1단계 부서를 선택해 주세요 --'}</option>
                                   ) : deptUsers.length === 0 ? (
-                                    <option value="">해당 부서에 등록된 직원이 없습니다</option>
+                                    <option value="">{isEn ? 'No employees registered in this department' : '해당 부서에 등록된 직원이 없습니다'}</option>
                                   ) : (
                                     <>
-                                      <option value="">-- [{assignedDeptSelect === '__ALL__' ? '전체 부서' : assignedDeptSelect}] 담당자 선택 ({deptUsers.length}명) --</option>
+                                      <option value="">{isEn ? `-- [${assignedDeptSelect === '__ALL__' ? 'All Depts' : assignedDeptSelect}] Select Assignee (${deptUsers.length}) --` : `-- [${assignedDeptSelect === '__ALL__' ? '전체 부서' : assignedDeptSelect}] 담당자 선택 (${deptUsers.length}명) --`}</option>
                                       {deptUsers.map(u => (
                                         <option key={u.username} value={u.username}>
-                                          {u.name} (사번: {u.username}) {u.deptName ? `[${u.deptName}]` : ''} - {getRoleKoreanName(u.role)}
+                                          {u.name} ({isEn ? 'ID: ' : '사번: '}{u.username}) {u.deptName ? `[${u.deptName}]` : ''} - {getRoleKoreanName(u.role)}
                                         </option>
                                       ))}
                                     </>
@@ -4711,12 +4815,12 @@ const Dashboard = () => {
                               type="button"
                               onClick={() => {
                                 if (!assignedDeptSelect) {
-                                  setError('소속 부서를 먼저 선택해 주세요.');
+                                  setError(isEn ? 'Please select a department first.' : '소속 부서를 먼저 선택해 주세요.');
                                   setTimeout(() => setError(''), 3000);
                                   return;
                                 }
                                 if (!assignedUserSelect) {
-                                  setError('담당자를 선택해 주세요.');
+                                  setError(isEn ? 'Please select an assignee.' : '담당자를 선택해 주세요.');
                                   setTimeout(() => setError(''), 3000);
                                   return;
                                 }
@@ -4736,7 +4840,7 @@ const Dashboard = () => {
                                 whiteSpace: 'nowrap'
                               }}
                             >
-                              대상자 추가
+                              {isEn ? 'Add Assignee' : '대상자 추가'}
                             </button>
                           </div>
                         </div>
@@ -4754,14 +4858,16 @@ const Dashboard = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontWeight: 'bold', fontSize: '14px', color: '#0369a1' }}>
-                            유관부서 및 협조 담당자 지정
+                            {isEn ? 'Assign Related Depts & Members' : '유관부서 및 협조 담당자 지정'}
                           </span>
                           <span style={{ fontSize: '12px', fontWeight: 'bold', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '12px', border: '1px solid #7dd3fc' }}>
-                            {selectedRelatedMembers.length}곳 지정됨
+                            {selectedRelatedMembers.length}{isEn ? ' assigned' : '곳 지정됨'}
                           </span>
                         </div>
                         <span style={{ fontSize: '12px', color: '#0284c7', fontWeight: '500' }}>
-                          ※ 프로젝트 생성 시 지정된 유관부서 담당자가 자동으로 불러와집니다. 필요 시 [✕]로 삭제하거나 아래에서 추가할 수 있습니다.
+                          {isEn 
+                            ? '※ Dept members assigned during project creation are loaded automatically. Use [✕] to remove or add below if needed.'
+                            : '※ 프로젝트 생성 시 지정된 유관부서 담당자가 자동으로 불러와집니다. 필요 시 [✕]로 삭제하거나 아래에서 추가할 수 있습니다.'}
                         </span>
                       </div>
 
@@ -4769,7 +4875,9 @@ const Dashboard = () => {
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '14px', minHeight: '34px', alignItems: 'center', backgroundColor: '#ffffff', padding: '8px 12px', borderRadius: '6px', border: '1px dashed #7dd3fc' }}>
                         {selectedRelatedMembers.length === 0 ? (
                           <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                            지정된 유관부서 및 협조 담당자가 없습니다. 아래에서 유관부서와 담당자를 선택 후 [협조 담당자 추가] 버튼을 눌러주세요.
+                            {isEn 
+                              ? 'No related members designated yet. Select related dept & member below, then click [Add Member].'
+                              : '지정된 유관부서 및 협조 담당자가 없습니다. 아래에서 유관부서와 담당자를 선택 후 [협조 담당자 추가] 버튼을 눌러주세요.'}
                           </span>
                         ) : (
                           selectedRelatedMembers.map((m, idx) => (
@@ -4809,7 +4917,7 @@ const Dashboard = () => {
                                     padding: '0 2px',
                                     lineHeight: 1
                                   }}
-                                  title="유관부서 및 담당자 제거"
+                                  title={isEn ? 'Remove member' : '유관부서 및 담당자 제거'}
                                 >
                                   ✕
                                 </button>
@@ -4843,7 +4951,7 @@ const Dashboard = () => {
                               <>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 240px' }}>
                                   <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0369a1', marginBottom: 0 }}>
-                                    1단계: 유관부서 선택
+                                    {isEn ? 'Step 1: Select Related Dept' : '1단계: 유관부서 선택'}
                                   </label>
                                   <select
                                     value={relatedDeptSelect}
@@ -4853,8 +4961,8 @@ const Dashboard = () => {
                                     }}
                                     style={{ ...styles.select, fontSize: '12px', padding: '6px 8px' }}
                                   >
-                                    <option value="">-- 유관부서 선택 ({allAvailableDepts.length}개) --</option>
-                                    <option value="__ALL__">-- [전체 유관부서] 협조 담당자 목록에서 바로 선택 ({allDeptMemberUsers.length}명) --</option>
+                                    <option value="">{isEn ? `-- Select Related Dept (${allAvailableDepts.length}) --` : `-- 유관부서 선택 (${allAvailableDepts.length}개) --`}</option>
+                                    <option value="__ALL__">{isEn ? `-- [All Related Depts] Select from full list (${allDeptMemberUsers.length}) --` : `-- [전체 유관부서] 협조 담당자 목록에서 바로 선택 (${allDeptMemberUsers.length}명) --`}</option>
                                     {allAvailableDepts.map(d => (
                                       <option key={d} value={d}>{d}</option>
                                     ))}
@@ -4864,7 +4972,7 @@ const Dashboard = () => {
                                 {/* 2단계: 유관부서 협조 담당자 선택 (선택된 부서 소속 직원만 표시) */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: '1 1 280px' }}>
                                   <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0369a1', marginBottom: 0 }}>
-                                    2단계: 협조 담당자 선택 (필수)
+                                    {isEn ? 'Step 2: Select Related Member (Required)' : '2단계: 협조 담당자 선택 (필수)'}
                                   </label>
                                   {(() => {
                                     const deptUsers = relatedDeptSelect === '__ALL__'
@@ -4884,15 +4992,15 @@ const Dashboard = () => {
                                         }}
                                       >
                                         {!relatedDeptSelect ? (
-                                          <option value="">-- 먼저 1단계 유관부서를 선택해 주세요 --</option>
+                                          <option value="">{isEn ? '-- Select Step 1 Dept first --' : '-- 먼저 1단계 유관부서를 선택해 주세요 --'}</option>
                                         ) : deptUsers.length === 0 ? (
-                                          <option value="">해당 부서에 등록된 직원이 없습니다</option>
+                                          <option value="">{isEn ? 'No employees registered in this department' : '해당 부서에 등록된 직원이 없습니다'}</option>
                                         ) : (
                                           <>
-                                            <option value="">-- [{relatedDeptSelect === '__ALL__' ? '전체 유관부서' : relatedDeptSelect}] 협조 담당자 선택 ({deptUsers.length}명) --</option>
+                                            <option value="">{isEn ? `-- [${relatedDeptSelect === '__ALL__' ? 'All Depts' : relatedDeptSelect}] Select Member (${deptUsers.length}) --` : `-- [${relatedDeptSelect === '__ALL__' ? '전체 유관부서' : relatedDeptSelect}] 협조 담당자 선택 (${deptUsers.length}명) --`}</option>
                                             {deptUsers.map(u => (
                                               <option key={u.username} value={u.username}>
-                                                {u.name} (사번: {u.username}) {u.deptName ? `[${u.deptName}]` : ''} - {u.corpId}
+                                                {u.name} ({isEn ? 'ID: ' : '사번: '}{u.username}) {u.deptName ? `[${u.deptName}]` : ''} - {u.corpId}
                                               </option>
                                             ))}
                                           </>
@@ -4908,17 +5016,17 @@ const Dashboard = () => {
                                     type="button"
                                     onClick={() => {
                                       if (!relatedDeptSelect) {
-                                        setError('유관부서를 먼저 선택해 주세요.');
+                                        setError(isEn ? 'Please select a related department first.' : '유관부서를 먼저 선택해 주세요.');
                                         setTimeout(() => setError(''), 3000);
                                         return;
                                       }
                                       if (!relatedUserSelect) {
-                                        setError('유관부서의 협조 담당자를 선택해 주세요.');
+                                        setError(isEn ? 'Please select a member from the related department.' : '유관부서의 협조 담당자를 선택해 주세요.');
                                         setTimeout(() => setError(''), 3000);
                                         return;
                                       }
                                       const chosenUser = usersList.find(u => u.username === relatedUserSelect);
-                                      const actualDept = relatedDeptSelect === '__ALL__' ? (chosenUser?.deptName || '유관부서') : relatedDeptSelect;
+                                      const actualDept = relatedDeptSelect === '__ALL__' ? (chosenUser?.deptName || (isEn ? 'Dept' : '유관부서')) : relatedDeptSelect;
                                       handleAddRelatedMember(actualDept, relatedUserSelect, chosenUser?.name || '');
                                     }}
                                     style={{
@@ -4933,7 +5041,7 @@ const Dashboard = () => {
                                       whiteSpace: 'nowrap'
                                     }}
                                   >
-                                    협조 담당자 추가
+                                    {isEn ? 'Add Member' : '협조 담당자 추가'}
                                   </button>
                                 </div>
                               </>
@@ -4956,7 +5064,9 @@ const Dashboard = () => {
                       marginBottom: '16px',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <label style={{ ...styles.formLabel, whiteSpace: 'nowrap', marginBottom: 0, color: '#374151' }}>감사팀 예상 마감일</label>
+                        <label style={{ ...styles.formLabel, whiteSpace: 'nowrap', marginBottom: 0, color: '#374151' }}>
+                          {isEn ? 'Audit Due Date' : '감사팀 예상 마감일'}
+                        </label>
                         <input
                           type="date"
                           value={capDeadline1st}
@@ -4967,10 +5077,12 @@ const Dashboard = () => {
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '220px' }}>
-                        <label style={{ ...styles.formLabel, whiteSpace: 'nowrap', marginBottom: 0, color: '#374151' }}>텍스트 일정</label>
+                        <label style={{ ...styles.formLabel, whiteSpace: 'nowrap', marginBottom: 0, color: '#374151' }}>
+                          {isEn ? 'Text Schedule' : '텍스트 일정'}
+                        </label>
                         <input
                           type="text"
-                          placeholder="예: 2026년 상반기 내"
+                          placeholder={isEn ? 'e.g. By 1H 2026' : '예: 2026년 상반기 내'}
                           value={targetDateText}
                           onChange={(e) => setTargetDateText(e.target.value)}
                           disabled={selectedCapId && !canEditCurrentCap}
@@ -4984,16 +5096,22 @@ const Dashboard = () => {
                       {selectedCapId ? (
                         canEditCurrentCap ? (
                           <button type="submit" style={{ ...styles.primaryBtn, backgroundColor: 'var(--saea-blue, #0077C8)' }}>
-                            선택된 지적사항 (CAP #{selectedCapDisplayNum}) 수정 내용 저장
+                            {isEn 
+                              ? `Save Finding (CAP #${selectedCapDisplayNum}) Edits` 
+                              : `선택된 지적사항 (CAP #${selectedCapDisplayNum}) 수정 내용 저장`}
                           </button>
                         ) : isAuditTeam ? (
                           <button type="submit" style={{ ...styles.primaryBtn, backgroundColor: '#059669' }}>
-                            지적사항 (CAP #{selectedCapDisplayNum}) 담당자 및 유관부서 변경 저장
+                            {isEn 
+                              ? `Save (CAP #${selectedCapDisplayNum}) Assignees & Depts` 
+                              : `지적사항 (CAP #${selectedCapDisplayNum}) 담당자 및 유관부서 변경 저장`}
                           </button>
                         ) : null
                       ) : (
                         <button type="submit" style={{ ...styles.primaryBtn, backgroundColor: '#16a34a' }}>
-                          CAP #{nextCapDisplayNum} 신규 지적사항 등록 저장
+                          {isEn 
+                            ? `Save CAP #${nextCapDisplayNum} New Registration` 
+                            : `CAP #${nextCapDisplayNum} 신규 지적사항 등록 저장`}
                         </button>
                       )}
                     </div>
@@ -5045,7 +5163,7 @@ const Dashboard = () => {
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <h4 style={{ margin: 0, fontSize: '17px', fontWeight: 'bold', color: '#ffffff', letterSpacing: '-0.3px' }}>
-                            분류 카테고리 관리
+                            {isEn ? 'Category Management' : '분류 카테고리 관리'}
                           </h4>
                         </div>
                         <button
@@ -5068,7 +5186,7 @@ const Dashboard = () => {
                           }}
                           onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'}
                           onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'}
-                          title="닫기"
+                          title={isEn ? 'Close' : '닫기'}
                         >
                           ✕
                         </button>
@@ -5085,12 +5203,12 @@ const Dashboard = () => {
                           marginBottom: '18px',
                         }}>
                           <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '6px' }}>
-                            신규 카테고리 등록
+                            {isEn ? 'Register New Category' : '신규 카테고리 등록'}
                           </label>
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <input
                               type="text"
-                              placeholder="신규 카테고리명 입력 (예: 인사/노무, 안전보건, 품질관리)"
+                              placeholder={isEn ? 'Enter new category name (e.g. HR/Labor, Safety, Quality)' : '신규 카테고리명 입력 (예: 인사/노무, 안전보건, 품질관리)'}
                               value={newCatInputName}
                               onChange={(e) => setNewCatInputName(e.target.value)}
                               onKeyDown={(e) => {
@@ -5124,7 +5242,7 @@ const Dashboard = () => {
                                 boxShadow: '0 2px 4px rgba(0, 119, 200, 0.25)',
                               }}
                             >
-                              추가
+                              {isEn ? 'Add' : '추가'}
                             </button>
                           </div>
                         </div>
@@ -5132,10 +5250,10 @@ const Dashboard = () => {
                         {/* 카테고리 목록 테이블 */}
                         <div style={{ marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
-                            📋 등록된 카테고리 목록 ({categories.length}개)
+                            📋 {isEn ? `Registered Categories (${categories.length})` : `등록된 카테고리 목록 (${categories.length}개)`}
                           </span>
                           <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                            ※ 발견사항 등록 시 분류 선택 목록에 반영됩니다.
+                            {isEn ? '※ Reflected in category options when creating findings.' : '※ 발견사항 등록 시 분류 선택 목록에 반영됩니다.'}
                           </span>
                         </div>
 
@@ -5150,15 +5268,15 @@ const Dashboard = () => {
                             <thead style={{ position: 'sticky', top: 0, backgroundColor: '#f1f5f9', zIndex: 1 }}>
                               <tr>
                                 <th style={{ ...styles.th, width: '50px', textAlign: 'center', backgroundColor: '#f1f5f9', borderBottom: '1.5px solid #cbd5e1' }}>No</th>
-                                <th style={{ ...styles.th, backgroundColor: '#f1f5f9', borderBottom: '1.5px solid #cbd5e1' }}>카테고리명</th>
-                                <th style={{ ...styles.th, width: '130px', textAlign: 'center', backgroundColor: '#f1f5f9', borderBottom: '1.5px solid #cbd5e1' }}>관리</th>
+                                <th style={{ ...styles.th, backgroundColor: '#f1f5f9', borderBottom: '1.5px solid #cbd5e1' }}>{isEn ? 'Category Name' : '카테고리명'}</th>
+                                <th style={{ ...styles.th, width: '130px', textAlign: 'center', backgroundColor: '#f1f5f9', borderBottom: '1.5px solid #cbd5e1' }}>{isEn ? 'Manage' : '관리'}</th>
                               </tr>
                             </thead>
                             <tbody>
                               {categories.length === 0 ? (
                                 <tr>
                                   <td colSpan="3" style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
-                                    등록된 카테고리가 없습니다. 상단에서 추가해 주세요.
+                                    {isEn ? 'No categories registered. Please add from above.' : '등록된 카테고리가 없습니다. 상단에서 추가해 주세요.'}
                                   </td>
                                 </tr>
                               ) : (
@@ -5219,7 +5337,7 @@ const Dashboard = () => {
                                               cursor: 'pointer',
                                             }}
                                           >
-                                            저장
+                                            {isEn ? 'Save' : '저장'}
                                           </button>
                                           <button
                                             type="button"
@@ -5235,7 +5353,7 @@ const Dashboard = () => {
                                               cursor: 'pointer',
                                             }}
                                           >
-                                            취소
+                                            {isEn ? 'Cancel' : '취소'}
                                           </button>
                                         </div>
                                       ) : (
@@ -5257,7 +5375,7 @@ const Dashboard = () => {
                                               cursor: 'pointer',
                                             }}
                                           >
-                                            수정
+                                            {isEn ? 'Edit' : '수정'}
                                           </button>
                                           <button
                                             type="button"
@@ -5273,7 +5391,7 @@ const Dashboard = () => {
                                               cursor: 'pointer',
                                             }}
                                           >
-                                            삭제
+                                            {isEn ? 'Delete' : '삭제'}
                                           </button>
                                         </div>
                                       )}
@@ -5309,7 +5427,7 @@ const Dashboard = () => {
                             boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
                           }}
                         >
-                          닫기
+                          {isEn ? 'Close' : '닫기'}
                         </button>
                       </div>
                     </div>
@@ -5359,9 +5477,10 @@ const Dashboard = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>
-                        법인별 전체 감사 조치율 및 프로젝트 완료(Completion) / Open 관리
+                        {isEn 
+                          ? 'Audit Action Rates & Project Completion / Open Control' 
+                          : '법인별 전체 감사 조치율 및 프로젝트 완료(Completion) / Open 관리'}
                       </h3>
-                      
                     </div>
                   </div>
 
@@ -5379,7 +5498,9 @@ const Dashboard = () => {
                   }}>
                     {/* Register Date 필터 (From ~ To 기간 검색) */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>등록기간:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Date Period:' : '등록기간:'}
+                      </span>
                       <input
                         type="date"
                         value={filterProjDateFrom}
@@ -5397,14 +5518,16 @@ const Dashboard = () => {
 
                     {/* 법인 필터 (콤보): 감사팀/시스템관리자가 아닌 경우 본인 소속 법인만 선택 가능 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>소속법인:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Corporation:' : '소속법인:'}
+                      </span>
                       {isAuditTeam ? (
                         <select
                           value={filterProjCorp}
                           onChange={(e) => setFilterProjCorp(e.target.value)}
                           style={{ padding: '5px 8px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
                         >
-                          <option value="">[ 전체 법인 ]</option>
+                          <option value="">{isEn ? '[ All Corps ]' : '[ 전체 법인 ]'}</option>
                           {uniqueProjCorps.map(corp => (
                             <option key={corp} value={corp}>{corp}</option>
                           ))}
@@ -5423,22 +5546,24 @@ const Dashboard = () => {
                             fontWeight: 'bold',
                             cursor: 'not-allowed'
                           }}
-                          title="법인 감사 담당자 / 감사 책임자 / 시스템 관리자 외에는 해당 법인만 조회할 수 있습니다."
+                          title={isEn ? "Only Audit Team & Admin can view other corporations." : "법인 감사 담당자 / 감사 책임자 / 시스템 관리자 외에는 해당 법인만 조회할 수 있습니다."}
                         >
-                          <option value={user?.corpId || ''}>{user?.corpId || '소속법인'}</option>
+                          <option value={user?.corpId || ''}>{user?.corpId || (isEn ? 'Corporation' : '소속법인')}</option>
                         </select>
                       )}
                     </div>
 
                     {/* 상태 필터 (콤보) */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>통제상태:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Control Status:' : '통제상태:'}
+                      </span>
                       <select
                         value={filterProjState}
                         onChange={(e) => setFilterProjState(e.target.value)}
                         style={{ padding: '5px 8px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
                       >
-                        <option value="">[ 전체 ]</option>
+                        <option value="">{isEn ? '[ All ]' : '[ 전체 ]'}</option>
                         {uniqueProjStates.map(state => (
                           <option key={state} value={state}>{state}</option>
                         ))}
@@ -5447,10 +5572,12 @@ const Dashboard = () => {
 
                     {/* 프로젝트명 필터 (인풋) */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>프로젝트명:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Project Name:' : '프로젝트명:'}
+                      </span>
                       <input
                         type="text"
-                        placeholder="프로젝트명 검색..."
+                        placeholder={isEn ? 'Search project...' : '프로젝트명 검색...'}
                         value={filterProjName}
                         onChange={(e) => setFilterProjName(e.target.value)}
                         style={{
@@ -5517,7 +5644,7 @@ const Dashboard = () => {
                             fontWeight: 'bold'
                           }}
                         >
-                          필터 초기화
+                          {isEn ? 'Reset Filter' : '필터 초기화'}
                         </button>
                       )}
                   </div>
@@ -5528,19 +5655,19 @@ const Dashboard = () => {
                   <table style={{ ...styles.table, marginTop: '10px' }}>
                     <thead>
                       <tr>
-                        <th style={styles.th}>프로젝트명</th>
-                        <th style={styles.th}>소속법인</th>
-                        <th style={styles.th}>마감일정 (1차 / 2차 / 3차)</th>
-                        <th style={styles.th}>법인 내 결재 상태</th>
-                        <th style={styles.th}>감사팀 결재 단계 (담당자 ➔ 책임자)</th>
-                        <th style={styles.th}>통제 상태</th>
-                        <th style={{ ...styles.th, minWidth: '200px' }}>감사 검토 & 최종승인 제어</th>
+                        <th style={styles.th}>{isEn ? 'Project Name' : '프로젝트명'}</th>
+                        <th style={styles.th}>{isEn ? 'Corporation' : '소속법인'}</th>
+                        <th style={styles.th}>{isEn ? 'Due Dates (1st / 2nd / 3rd)' : '마감일정 (1차 / 2차 / 3차)'}</th>
+                        <th style={styles.th}>{isEn ? 'Corp. Internal Approval' : '법인 내 결재 상태'}</th>
+                        <th style={styles.th}>{isEn ? 'Audit Approval Flow' : '감사팀 결재 단계 (담당자 ➔ 책임자)'}</th>
+                        <th style={styles.th}>{isEn ? 'Status' : '통제 상태'}</th>
+                        <th style={{ ...styles.th, minWidth: '200px' }}>{isEn ? 'Audit Review & Sign-off Action' : '감사 검토 & 최종승인 제어'}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredProjects.length === 0 ? (
                         <tr>
-                          <td colSpan="7" style={styles.tdCenter}>등록된 프로젝트가 존재하지 않습니다.</td>
+                          <td colSpan="7" style={styles.tdCenter}>{isEn ? 'No projects registered.' : '등록된 프로젝트가 존재하지 않습니다.'}</td>
                         </tr>
                       ) : (
                         filteredProjects.map(p => {
@@ -5564,37 +5691,37 @@ const Dashboard = () => {
                               <td style={styles.td}><strong>{p.projectName}</strong></td>
                               <td style={styles.td}>{p.corpId}</td>
                               <td style={styles.td}>
-                                <span style={styles.dateBadge}>{p.deadline2nd || p.deadline3rd ? '1차: ' : '마감일: '}{p.deadline1st ? p.deadline1st.substring(0, 10) : '-'}</span>
-                                {p.deadline2nd && <span style={styles.dateBadge}>2차: {p.deadline2nd.substring(0, 10)}</span>}
-                                {p.deadline3rd && <span style={styles.dateBadge}>3차: {p.deadline3rd.substring(0, 10)}</span>}
+                                <span style={styles.dateBadge}>{p.deadline2nd || p.deadline3rd ? (isEn ? '1st: ' : '1차: ') : (isEn ? 'Due: ' : '마감일: ')}{p.deadline1st ? p.deadline1st.substring(0, 10) : '-'}</span>
+                                {p.deadline2nd && <span style={styles.dateBadge}>{isEn ? '2nd: ' : '2차: '}{p.deadline2nd.substring(0, 10)}</span>}
+                                {p.deadline3rd && <span style={styles.dateBadge}>{isEn ? '3rd: ' : '3차: '}{p.deadline3rd.substring(0, 10)}</span>}
                               </td>
                               <td style={styles.td}>
                                 {/* 법인 내 결재 상태 */}
                                 {totalCount === 0 ? (
                                   <span style={{ ...styles.badgeStatus, backgroundColor: '#f1f5f9', color: '#64748b' }}>
-                                    등록 항목 없음 (0건)
+                                    {isEn ? 'No items (0)' : '등록 항목 없음 (0건)'}
                                   </span>
                                 ) : (isAllHeadApproved || isHeadConfirmed) ? (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                     <span style={{ ...styles.badgeStatus, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
-                                      법인장 결재 완료 {p.headConfirmedBy ? `(${p.headConfirmedBy})` : `(${headApprovedCount}/${totalCount})`}
+                                      {isEn ? 'Head Approved' : '법인장 결재 완료'} {p.headConfirmedBy ? `(${p.headConfirmedBy})` : `(${headApprovedCount}/${totalCount})`}
                                     </span>
                                     {p.headConfirmedAt && (
                                       <span style={{ fontSize: '11px', color: '#166534' }}>
-                                        확정: {new Date(p.headConfirmedAt).toLocaleDateString()}
+                                        {isEn ? 'Confirmed: ' : '확정: '}{new Date(p.headConfirmedAt).toLocaleDateString()}
                                       </span>
                                     )}
                                   </div>
                                 ) : (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                     <span style={{ ...styles.badgeStatus, backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
-                                      결재 진행 중 (완료 {headApprovedCount}/{totalCount})
+                                      {isEn ? `In Approval (${headApprovedCount}/${totalCount})` : `결재 진행 중 (완료 ${headApprovedCount}/${totalCount})`}
                                     </span>
                                     <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                      {pendingHeadCount > 0 && <span style={{ color: '#7c3aed', marginRight: '5px' }}>법인장대기 {pendingHeadCount}건</span>}
-                                      {pendingLeadCount > 0 && <span style={{ color: '#d97706', marginRight: '5px' }}>대표대기 {pendingLeadCount}건</span>}
-                                      {draftCount > 0 && <span style={{ color: '#64748b', marginRight: '5px' }}>작성중 {draftCount}건</span>}
-                                      {rejectedCount > 0 && <span style={{ color: '#dc2626' }}>반려 {rejectedCount}건</span>}
+                                      {pendingHeadCount > 0 && <span style={{ color: '#7c3aed', marginRight: '5px' }}>{isEn ? `Pending Head (${pendingHeadCount})` : `법인장대기 ${pendingHeadCount}건`}</span>}
+                                      {pendingLeadCount > 0 && <span style={{ color: '#d97706', marginRight: '5px' }}>{isEn ? `Pending Rep (${pendingLeadCount})` : `대표대기 ${pendingLeadCount}건`}</span>}
+                                      {draftCount > 0 && <span style={{ color: '#64748b', marginRight: '5px' }}>{isEn ? `Draft (${draftCount})` : `작성중 ${draftCount}건`}</span>}
+                                      {rejectedCount > 0 && <span style={{ color: '#dc2626' }}>{isEn ? `Rejected (${rejectedCount})` : `반려 ${rejectedCount}건`}</span>}
                                     </div>
                                   </div>
                                 )}
@@ -5604,7 +5731,7 @@ const Dashboard = () => {
                                 {auditStatus === 'AUDIT_REJECTED' && (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                     <span style={{ ...styles.badgeStatus, backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca' }}>
-                                      감사 보완요청됨
+                                      {isEn ? 'Audit Revision Requested' : '감사 보완요청됨'}
                                     </span>
                                     {p.auditRejectedReason && (
                                       <span style={{ fontSize: '11px', color: '#b91c1c' }}>"{p.auditRejectedReason}"</span>
@@ -5614,32 +5741,32 @@ const Dashboard = () => {
                                 {auditStatus === 'LEADER_APPROVED' && (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                     <span style={{ ...styles.badgeStatus, backgroundColor: '#dbeafe', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
-                                      감사책임자 최종승인 완료
+                                      {isEn ? 'Leader Final Approved' : '감사책임자 최종승인 완료'}
                                     </span>
                                     <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                      • 담당자: <b>{p.auditorReviewedBy || '-'}</b> ({p.auditorReviewedAt ? new Date(p.auditorReviewedAt).toLocaleDateString() : ''})<br />
-                                      • 책임자: <b>{p.auditLeaderApprovedBy || '-'}</b> ({p.auditLeaderApprovedAt ? new Date(p.auditLeaderApprovedAt).toLocaleDateString() : ''})
+                                      • {isEn ? 'Auditor:' : '담당자:'} <b>{p.auditorReviewedBy || '-'}</b> ({p.auditorReviewedAt ? new Date(p.auditorReviewedAt).toLocaleDateString() : ''})<br />
+                                      • {isEn ? 'Leader:' : '책임자:'} <b>{p.auditLeaderApprovedBy || '-'}</b> ({p.auditLeaderApprovedAt ? new Date(p.auditLeaderApprovedAt).toLocaleDateString() : ''})
                                     </div>
                                   </div>
                                 )}
                                 {auditStatus === 'AUDITOR_CONFIRMED' && (
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                     <span style={{ ...styles.badgeStatus, backgroundColor: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe' }}>
-                                      담당자 확인완료 (책임자 승인대기)
+                                      {isEn ? 'Auditor Confirmed (Pending Leader)' : '담당자 확인완료 (책임자 승인대기)'}
                                     </span>
                                     <div style={{ fontSize: '11px', color: '#64748b' }}>
-                                      • 확인자: <b>{p.auditorReviewedBy}</b> ({p.auditorReviewedAt ? new Date(p.auditorReviewedAt).toLocaleDateString() : ''})
+                                      • {isEn ? 'Confirmed by:' : '확인자:'} <b>{p.auditorReviewedBy}</b> ({p.auditorReviewedAt ? new Date(p.auditorReviewedAt).toLocaleDateString() : ''})
                                     </div>
                                   </div>
                                 )}
                                 {auditStatus === 'HEAD_CONFIRMED' && (
                                   <span style={{ ...styles.badgeStatus, backgroundColor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}>
-                                    감사팀 검토 대기 (법인장 확정완료)
+                                    {isEn ? 'Pending Audit Review (Head Confirmed)' : '감사팀 검토 대기 (법인장 확정완료)'}
                                   </span>
                                 )}
                                 {auditStatus === 'PENDING_AUDIT' && (
                                   <span style={{ ...styles.badgeStatus, backgroundColor: '#f1f5f9', color: '#64748b' }}>
-                                    감사담당자 확인 대기
+                                    {isEn ? 'Pending Auditor Review' : '감사담당자 확인 대기'}
                                   </span>
                                 )}
                               </td>
@@ -5652,7 +5779,7 @@ const Dashboard = () => {
                                 {/* 감사 검토 & 최종승인 액션 버튼 (감사담당자 확인 ➔ 감사책임자 최종승인 & Freeze) */}
                                 {(!canFreezeOrOpen && !isAuditTeam) ? (
                                   <span style={{ fontSize: '11px', color: '#dc2626', fontWeight: 'bold' }}>
-                                    ※ 법인장 결재 완료 후 가능
+                                    {isEn ? '※ Available after Corp Head sign-off' : '※ 법인장 결재 완료 후 가능'}
                                   </span>
                                 ) : (
                                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -5664,21 +5791,21 @@ const Dashboard = () => {
                                             <button
                                               onClick={() => openAuditorReviewProjModal(p)}
                                               style={{ ...styles.approveActionBtn, backgroundColor: '#4f46e5' }}
-                                              title="감사 담당자로서 조치내용을 검토하고 확인합니다."
+                                              title={isEn ? "Review action details as auditor." : "감사 담당자로서 조치내용을 검토하고 확인합니다."}
                                             >
-                                              담당자 내용 확인
+                                              {isEn ? 'Auditor Review' : '담당자 내용 확인'}
                                             </button>
                                             <button
                                               onClick={() => openAuditRejectProjModal(p)}
                                               style={styles.rejectActionBtn}
-                                              title="내용이 미흡하여 보완을 요청합니다."
+                                              title={isEn ? "Request revision due to insufficient details." : "내용이 미흡하여 보완을 요청합니다."}
                                             >
-                                              보완요청
+                                              {isEn ? 'Req. Revision' : '보완요청'}
                                             </button>
                                           </>
                                         ) : (
                                           <span style={{ fontSize: '12px', color: '#059669', fontWeight: 'bold' }}>
-                                            담당자 확인완료
+                                            {isEn ? 'Auditor Confirmed' : '담당자 확인완료'}
                                           </span>
                                         )}
                                       </>
@@ -5690,30 +5817,30 @@ const Dashboard = () => {
                                         {p.projectState === 'FREEZE' ? (
                                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                             <span style={{ fontSize: '12px', color: '#047857', fontWeight: 'bold', backgroundColor: '#d1fae5', padding: '3px 8px', borderRadius: '4px' }}>
-                                              최종 확정 및 완료 (Completion)
+                                              {isEn ? 'Completion' : '최종 확정 및 완료 (Completion)'}
                                             </span>
                                             <button
                                               onClick={() => handleUnfreezeProject(p.projectId, p.corpId)}
                                               style={styles.unfreezeBtn}
-                                              title="프로젝트 완료를 해제(Open)합니다."
+                                              title={isEn ? "Open completed project." : "프로젝트 완료를 해제(Open)합니다."}
                                             >
-                                              완료해제(Open)
+                                              {isEn ? 'Unfreeze (Open)' : '완료해제(Open)'}
                                             </button>
                                           </div>
                                         ) : (
                                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
                                             {auditStatus === 'AUDITOR_CONFIRMED' && (
                                               <span style={{ fontSize: '11px', color: '#6d28d9', fontWeight: 'bold', backgroundColor: '#ede9fe', padding: '3px 8px', borderRadius: '4px' }}>
-                                                담당자 확인완료
+                                                {isEn ? 'Auditor Confirmed' : '담당자 확인완료'}
                                               </span>
                                             )}
                                             {auditStatus !== 'AUDITOR_CONFIRMED' && (
                                               <button
                                                 onClick={() => openAuditorReviewProjModal(p)}
                                                 style={{ ...styles.approveActionBtn, backgroundColor: '#4f46e5' }}
-                                                title="감사 책임자로서 조치내용을 직접 확인합니다. (확인 후 바로 완료(Completion) 가능)"
+                                                title={isEn ? "Review action details as audit leader." : "감사 책임자로서 조치내용을 직접 확인합니다. (확인 후 바로 완료(Completion) 가능)"}
                                               >
-                                                담당자 내용 확인
+                                                {isEn ? 'Leader Review' : '담당자 내용 확인'}
                                               </button>
                                             )}
                                             <button
@@ -5726,16 +5853,16 @@ const Dashboard = () => {
                                                 alignItems: 'center',
                                                 gap: '4px'
                                               }}
-                                              title="감사 책임자로서 최종 승인하고 프로젝트를 완료(Completion)합니다."
+                                              title={isEn ? "Final approve and complete project as audit leader." : "감사 책임자로서 최종 승인하고 프로젝트를 완료(Completion)합니다."}
                                             >
-                                              최종 확정 및 완료 (Completion)
+                                              {isEn ? 'Final Sign-off & Completion' : '최종 확정 및 완료 (Completion)'}
                                             </button>
                                             <button
                                               onClick={() => openAuditRejectProjModal(p)}
                                               style={styles.rejectActionBtn}
-                                              title="내용이 미흡하여 보완을 요청합니다."
+                                              title={isEn ? "Request revision due to insufficient details." : "내용이 미흡하여 보완을 요청합니다."}
                                             >
-                                              보완요청
+                                              {isEn ? 'Req. Revision' : '보완요청'}
                                             </button>
                                           </div>
                                         )}
@@ -5750,7 +5877,7 @@ const Dashboard = () => {
                                             onClick={() => openAuditorReviewProjModal(p)}
                                             style={{ ...styles.approveActionBtn, backgroundColor: '#4f46e5' }}
                                           >
-                                            담당자 확인
+                                            {isEn ? 'Confirm Review' : '담당자 확인'}
                                           </button>
                                         )}
                                         {p.projectState !== 'FREEZE' ? (
@@ -5758,21 +5885,21 @@ const Dashboard = () => {
                                             onClick={() => openLeaderApproveProjModal(p)}
                                             style={styles.approveActionBtn}
                                           >
-                                            최종 확정 (Completion)
+                                            {isEn ? 'Final Completion' : '최종 확정 (Completion)'}
                                           </button>
                                         ) : (
                                           <button
                                             onClick={() => handleUnfreezeProject(p.projectId, p.corpId)}
                                             style={styles.unfreezeBtn}
                                           >
-                                            완료해제(Open)
+                                            {isEn ? 'Unfreeze (Open)' : '완료해제(Open)'}
                                           </button>
                                         )}
                                         <button
                                           onClick={() => openAuditRejectProjModal(p)}
                                           style={styles.rejectActionBtn}
                                         >
-                                          보완요청
+                                          {isEn ? 'Req. Revision' : '보완요청'}
                                         </button>
                                       </>
                                     )}
@@ -5780,7 +5907,7 @@ const Dashboard = () => {
                                     {/* 4) 기타 역할 사용자 (법인장, 대표, 일반 등) */}
                                     {!isAuditTeam && (
                                       <span style={{ fontSize: '12px', color: '#64748b' }}>
-                                        {p.projectState === 'FREEZE' ? '최종 완료' : '감사팀 승인 진행 중'}
+                                        {p.projectState === 'FREEZE' ? (isEn ? 'Completed' : '최종 완료') : (isEn ? 'Under Audit Review' : '감사팀 승인 진행 중')}
                                       </span>
                                     )}
                                   </div>
@@ -5813,8 +5940,14 @@ const Dashboard = () => {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: '18px', color: '#1f2937' }}>임직원 계정 및 권한 관리</h3>
-                    <p style={{ ...styles.cardSubtitle, margin: '4px 0 0 0' }}>모든 사용자의 부서 및 현재 권한을 조회하고, 실시간으로 시스템 접근 권한을 변경합니다.</p>
+                    <h3 style={{ margin: 0, fontSize: '18px', color: '#1f2937' }}>
+                      {isEn ? 'Employee Accounts & Permissions Admin' : '임직원 계정 및 권한 관리'}
+                    </h3>
+                    <p style={{ ...styles.cardSubtitle, margin: '4px 0 0 0' }}>
+                      {isEn 
+                        ? 'View user departments and roles, and adjust permissions in real time.' 
+                        : '모든 사용자의 부서 및 현재 권한을 조회하고, 실시간으로 시스템 접근 권한을 변경합니다.'}
+                    </p>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     {Object.keys(pendingUserEdits).length > 0 && (
@@ -5834,7 +5967,7 @@ const Dashboard = () => {
                             cursor: 'pointer',
                           }}
                         >
-                          ↩️ 변경 취소
+                          {isEn ? '↩️ Discard Changes' : '↩️ 변경 취소'}
                         </button>
                         <button
                           type="button"
@@ -5855,7 +5988,7 @@ const Dashboard = () => {
                             boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)',
                           }}
                         >
-                          💾 변경사항 일괄 저장 ({Object.keys(pendingUserEdits).length}건)
+                          {isEn ? `💾 Batch Save (${Object.keys(pendingUserEdits).length})` : `💾 변경사항 일괄 저장 (${Object.keys(pendingUserEdits).length}건)`}
                         </button>
                       </>
                     )}
@@ -5876,7 +6009,7 @@ const Dashboard = () => {
                         boxShadow: '0 2px 4px rgba(37, 99, 235, 0.2)',
                       }}
                     >
-                      신규 사용자 등록
+                      {isEn ? '+ Register New User' : '신규 사용자 등록'}
                     </button>
                   </div>
                 </div>
@@ -5907,7 +6040,7 @@ const Dashboard = () => {
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #e5e7eb', paddingBottom: '12px' }}>
                         <h3 style={{ margin: 0, fontSize: '17px', color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          신규 사용자 등록 (시스템 관리자)
+                          {isEn ? 'Register New User (System Admin)' : '신규 사용자 등록 (시스템 관리자)'}
                         </h3>
                         <button
                           type="button"
@@ -5928,10 +6061,10 @@ const Dashboard = () => {
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
                           <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#0369a1', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            사내 인사 시스템 연동 사원 등록
+                            {isEn ? 'HR System Employee Lookup & Auto Registration' : '사내 인사 시스템 연동 사원 등록'}
                           </span>
                           <span style={{ fontSize: '11px', color: '#0284c7' }}>
-                            ※ 성명 입력 시 사번(ID) 및 소속 정보를 조회하여 즉시 등록합니다.
+                            {isEn ? '※ Search by name to query employee ID & department.' : '※ 성명 입력 시 사번(ID) 및 소속 정보를 조회하여 즉시 등록합니다.'}
                           </span>
                         </div>
 
@@ -5948,14 +6081,14 @@ const Dashboard = () => {
                               borderColor: '#38bdf8'
                             }}
                           >
-                            <option value="ALL">전체 법인</option>
-                            <option value="글로벌세아">글로벌세아</option>
-                            <option value="세아상역">세아상역</option>
+                            <option value="ALL">{isEn ? 'All Corps' : '전체 법인'}</option>
+                            <option value="글로벌세아">{isEn ? 'Global Sae-A' : '글로벌세아'}</option>
+                            <option value="세아상역">{isEn ? 'Sae-A Trading' : '세아상역'}</option>
                           </select>
 
                           <input
                             type="text"
-                            placeholder="사원 성명 입력 (예: 홍길동, 김철수)"
+                            placeholder={isEn ? 'Enter employee name (e.g. John Doe)' : '사원 성명 입력 (예: 홍길동, 김철수)'}
                             value={searchEmpName}
                             onChange={(e) => setSearchEmpName(e.target.value)}
                             onKeyDown={(e) => {
@@ -5992,7 +6125,7 @@ const Dashboard = () => {
                               whiteSpace: 'nowrap'
                             }}
                           >
-                            {searchEmpLoading ? '조회 중...' : '사원 검색'}
+                            {searchEmpLoading ? (isEn ? 'Searching...' : '조회 중...') : (isEn ? 'Search' : '사원 검색')}
                           </button>
                         </div>
 
@@ -6049,7 +6182,7 @@ const Dashboard = () => {
                                       fontSize: '12px',
                                       fontWeight: 'bold'
                                     }}>
-                                      ID(사번): {emp.username}
+                                      {isEn ? 'ID(Emp No):' : 'ID(사번):'} {emp.username}
                                     </span>
                                     <span style={{
                                       padding: '2px 8px',
@@ -6060,7 +6193,7 @@ const Dashboard = () => {
                                       fontSize: '11px',
                                       fontWeight: 'bold'
                                     }}>
-                                      기본 권한: 법인담당
+                                      {isEn ? 'Default Role: Member' : '기본 권한: 법인담당'}
                                     </span>
                                     {emp.alreadyRegistered && (
                                       <span style={{
@@ -6071,12 +6204,12 @@ const Dashboard = () => {
                                         fontSize: '11px',
                                         fontWeight: 'bold'
                                       }}>
-                                        이미 등록된 계정
+                                        {isEn ? 'Already Registered' : '이미 등록된 계정'}
                                       </span>
                                     )}
                                   </div>
                                   <div style={{ fontSize: '12px', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span>소속: <b>{emp.corpId}</b> / <b>{emp.deptName || '소속부서'}</b></span>
+                                    <span>{isEn ? 'Dept:' : '소속:'} <b>{emp.corpId}</b> / <b>{emp.deptName || (isEn ? 'Dept' : '소속부서')}</b></span>
                                     {emp.email && <span style={{ color: '#64748b' }}>• {emp.email}</span>}
                                   </div>
                                 </div>
@@ -6096,9 +6229,9 @@ const Dashboard = () => {
                                       fontWeight: 'bold',
                                       cursor: 'pointer'
                                     }}
-                                    title="이 사원의 정보를 아래 입력 폼에 자동으로 채웁니다"
+                                    title={isEn ? "Auto-fill this employee's info below" : "이 사원의 정보를 아래 입력 폼에 자동으로 채웁니다"}
                                   >
-                                    선택 (폼 자동완성)
+                                    {isEn ? 'Select (Auto-fill)' : '선택 (폼 자동완성)'}
                                   </button>
                                   <button
                                     type="button"
@@ -6114,9 +6247,9 @@ const Dashboard = () => {
                                       fontWeight: 'bold',
                                       cursor: emp.alreadyRegistered ? 'not-allowed' : 'pointer'
                                     }}
-                                    title="이 사원 정보를 바탕으로 기본 '법인담당' 권한의 계정을 즉시 생성합니다"
+                                    title={isEn ? "Quickly create account with default 'Member' role" : "이 사원 정보를 바탕으로 기본 '법인담당' 권한의 계정을 즉시 생성합니다"}
                                   >
-                                    즉시 계정 등록 (법인담당)
+                                    {isEn ? 'Quick Register' : '즉시 계정 등록 (법인담당)'}
                                   </button>
                                 </div>
                               </div>
@@ -6135,7 +6268,7 @@ const Dashboard = () => {
                         fontWeight: '500'
                       }}>
                         <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
-                        <span style={{ padding: '0 10px' }}>또는 사용자 정보 직접 수동 입력</span>
+                        <span style={{ padding: '0 10px' }}>{isEn ? 'Or Enter User Details Manually' : '또는 사용자 정보 직접 수동 입력'}</span>
                         <div style={{ flex: 1, height: '1px', backgroundColor: '#e2e8f0' }} />
                       </div>
 
@@ -6166,7 +6299,7 @@ const Dashboard = () => {
                                 type="text"
                                 name="create_new_user_id"
                                 autoComplete="off"
-                                placeholder="예: EMP001"
+                                placeholder={isEn ? 'e.g. EMP001' : '예: EMP001'}
                                 value={newUsername}
                                 onChange={(e) => {
                                   setNewUsername(e.target.value);
@@ -6192,7 +6325,7 @@ const Dashboard = () => {
                                   flexShrink: 0,
                                 }}
                               >
-                                {idCheckStatus === 'AVAILABLE' ? '확인완료' : '중복확인'}
+                                {idCheckStatus === 'AVAILABLE' ? (isEn ? 'Confirmed' : '확인완료') : (isEn ? 'Check ID' : '중복확인')}
                               </button>
                             </div>
                             {idCheckMessage && (
@@ -6208,12 +6341,12 @@ const Dashboard = () => {
                           </div>
 
                           <div style={styles.formGroup}>
-                            <label style={{ ...styles.formLabel, fontSize: '13px' }}>초기 비밀번호 <span style={{ color: '#ef4444' }}>*</span></label>
+                            <label style={{ ...styles.formLabel, fontSize: '13px' }}>{isEn ? 'Initial Password' : '초기 비밀번호'} <span style={{ color: '#ef4444' }}>*</span></label>
                             <input
                               type="password"
                               name="create_new_user_password"
                               autoComplete="new-password"
-                              placeholder="비밀번호 설정"
+                              placeholder={isEn ? 'Set password' : '비밀번호 설정'}
                               value={newPassword}
                               onChange={(e) => setNewPassword(e.target.value)}
                               required
@@ -6224,10 +6357,10 @@ const Dashboard = () => {
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                           <div style={styles.formGroup}>
-                            <label style={{ ...styles.formLabel, fontSize: '13px' }}>성명 <span style={{ color: '#ef4444' }}>*</span></label>
+                            <label style={{ ...styles.formLabel, fontSize: '13px' }}>{isEn ? 'Full Name' : '성명'} <span style={{ color: '#ef4444' }}>*</span></label>
                             <input
                               type="text"
-                              placeholder="예: 홍길동"
+                              placeholder={isEn ? 'e.g. John Doe' : '예: 홍길동'}
                               value={newName}
                               onChange={(e) => setNewName(e.target.value)}
                               required
@@ -6236,7 +6369,7 @@ const Dashboard = () => {
                           </div>
 
                           <div style={styles.formGroup}>
-                            <label style={{ ...styles.formLabel, fontSize: '13px' }}>이메일</label>
+                            <label style={{ ...styles.formLabel, fontSize: '13px' }}>{isEn ? 'Email' : '이메일'}</label>
                             <input
                               type="email"
                               placeholder="user@sae-a.com"
@@ -6249,7 +6382,7 @@ const Dashboard = () => {
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                           <div style={styles.formGroup}>
-                            <label style={{ ...styles.formLabel, fontSize: '13px' }}>소속 법인 <span style={{ color: '#ef4444' }}>*</span></label>
+                            <label style={{ ...styles.formLabel, fontSize: '13px' }}>{isEn ? 'Corporation' : '소속 법인'} <span style={{ color: '#ef4444' }}>*</span></label>
                             {(() => {
                               const existingCorps = Array.from(new Set(usersList.map(u => u.corpId).filter(Boolean))).sort();
                               const corpsToRender = existingCorps.length > 0 ? existingCorps : ['CORP_A', 'CORP_B', 'CORP_C'];
@@ -6265,17 +6398,17 @@ const Dashboard = () => {
                                     }}
                                     style={styles.select}
                                   >
-                                    <option value="">-- 소속 법인 선택 --</option>
+                                    <option value="">{isEn ? '-- Select Corporation --' : '-- 소속 법인 선택 --'}</option>
                                     {corpsToRender.map(corp => (
                                       <option key={corp} value={corp}>{corp}</option>
                                     ))}
-                                    <option value="__NEW__">[직접 입력] 신규 법인 입력...</option>
+                                    <option value="__NEW__">{isEn ? '➕ Enter new corporation manually...' : '[직접 입력] 신규 법인 입력...'}</option>
                                   </select>
 
                                   {newCorpId === '__NEW__' && (
                                     <input
                                       type="text"
-                                      placeholder="신규 법인 코드 또는 명칭 입력"
+                                      placeholder={isEn ? 'Enter new corporation code or name' : '신규 법인 코드 또는 명칭 입력'}
                                       value={customCorpInput}
                                       onChange={(e) => setCustomCorpInput(e.target.value)}
                                       required
@@ -6288,10 +6421,10 @@ const Dashboard = () => {
                           </div>
 
                           <div style={styles.formGroup}>
-                            <label style={{ ...styles.formLabel, fontSize: '13px' }}>담당 부서명 <span style={{ color: '#ef4444' }}>*</span></label>
+                            <label style={{ ...styles.formLabel, fontSize: '13px' }}>{isEn ? 'Department' : '담당 부서명'} <span style={{ color: '#ef4444' }}>*</span></label>
                             <input
                               type="text"
-                              placeholder="예: 감사팀, 회계팀"
+                              placeholder={isEn ? 'e.g. Audit, Accounting' : '예: 감사팀, 회계팀'}
                               value={newDeptName}
                               onChange={(e) => setNewDeptName(e.target.value)}
                               required
@@ -6301,7 +6434,7 @@ const Dashboard = () => {
                         </div>
 
                         <div style={styles.formGroup}>
-                          <label style={{ ...styles.formLabel, fontSize: '13px' }}>부여 권한 <span style={{ color: '#ef4444' }}>*</span></label>
+                          <label style={{ ...styles.formLabel, fontSize: '13px' }}>{isEn ? 'Role' : '부여 권한'} <span style={{ color: '#ef4444' }}>*</span></label>
                           <select
                             value={newRole}
                             onChange={(e) => setNewRole(e.target.value)}
@@ -6328,7 +6461,7 @@ const Dashboard = () => {
                               cursor: 'pointer',
                             }}
                           >
-                            취소
+                            {isEn ? 'Cancel' : '취소'}
                           </button>
                           <button
                             type="submit"
@@ -6343,7 +6476,7 @@ const Dashboard = () => {
                               cursor: 'pointer',
                             }}
                           >
-                            사용자 등록 완료
+                            {isEn ? 'Save User' : '사용자 등록 완료'}
                           </button>
                         </div>
                       </form>
@@ -6365,13 +6498,15 @@ const Dashboard = () => {
                 }}>
                   {/* 법인 필터 (콤보) */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>법인:</span>
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                      {isEn ? 'Corp:' : '법인:'}
+                    </span>
                     <select
                       value={filterCorp}
                       onChange={(e) => setFilterCorp(e.target.value)}
                       style={{ padding: '5px 10px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
                     >
-                      <option value="">[ 전체 ]</option>
+                      <option value="">{isEn ? '[ All ]' : '[ 전체 ]'}</option>
                       {Array.from(new Set(usersList.map(u => u.corpId).filter(Boolean))).sort().map(corp => (
                         <option key={corp} value={corp}>{corp}</option>
                       ))}
@@ -6380,13 +6515,15 @@ const Dashboard = () => {
 
                   {/* 부서 필터 (콤보) */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>부서:</span>
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                      {isEn ? 'Dept:' : '부서:'}
+                    </span>
                     <select
                       value={filterDept}
                       onChange={(e) => setFilterDept(e.target.value)}
                       style={{ padding: '5px 10px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
                     >
-                      <option value="">[ 전체 ]</option>
+                      <option value="">{isEn ? '[ All ]' : '[ 전체 ]'}</option>
                       {Array.from(new Set(usersList.map(u => u.deptName).filter(Boolean))).sort().map(dept => (
                         <option key={dept} value={dept}>{dept}</option>
                       ))}
@@ -6395,13 +6532,15 @@ const Dashboard = () => {
 
                   {/* 권한 필터 (콤보) */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>권한:</span>
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                      {isEn ? 'Role:' : '권한:'}
+                    </span>
                     <select
                       value={filterRole}
                       onChange={(e) => setFilterRole(e.target.value)}
                       style={{ padding: '5px 10px', fontSize: '13px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
                     >
-                      <option value="">[ 전체 ]</option>
+                      <option value="">{isEn ? '[ All ]' : '[ 전체 ]'}</option>
                       {ROLE_OPTIONS.map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ))}
@@ -6410,10 +6549,12 @@ const Dashboard = () => {
 
                   {/* 이름 필터 (텍스트) */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>이름:</span>
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                      {isEn ? 'Name:' : '이름:'}
+                    </span>
                     <input
                       type="text"
-                      placeholder="이름 입력..."
+                      placeholder={isEn ? 'Enter name...' : '이름 입력...'}
                       value={filterName}
                       onChange={(e) => setFilterName(e.target.value)}
                       style={{
@@ -6447,7 +6588,7 @@ const Dashboard = () => {
                         color: '#334155'
                       }}
                     >
-                      필터 초기화
+                      {isEn ? 'Reset Filter' : '필터 초기화'}
                     </button>
                   )}
                 </div>
@@ -6458,14 +6599,14 @@ const Dashboard = () => {
                 <table style={styles.table}>
                   <thead>
                     <tr>
-                      <th style={styles.th}>소속 법인</th>
-                      <th style={styles.th}>부서명</th>
+                      <th style={styles.th}>{isEn ? 'Corporation' : '소속 법인'}</th>
+                      <th style={styles.th}>{isEn ? 'Department' : '부서명'}</th>
                       <th style={styles.th}>ID</th>
-                      <th style={styles.th}>이름</th>
-                      <th style={styles.th}>현재 권한</th>
-                      <th style={styles.th}>권한 변경</th>
-                      <th style={styles.th}>사용 여부</th>
-                      <th style={{ ...styles.th, textAlign: 'center', width: '130px' }}>저장 / 관리</th>
+                      <th style={styles.th}>{isEn ? 'Name' : '이름'}</th>
+                      <th style={styles.th}>{isEn ? 'Current Role' : '현재 권한'}</th>
+                      <th style={styles.th}>{isEn ? 'Change Role' : '권한 변경'}</th>
+                      <th style={styles.th}>{isEn ? 'Status' : '사용 여부'}</th>
+                      <th style={{ ...styles.th, textAlign: 'center', width: '130px' }}>{isEn ? 'Save / Manage' : '저장 / 관리'}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -6508,7 +6649,7 @@ const Dashboard = () => {
                                   fontWeight: 'bold',
                                   border: '1px solid #86efac'
                                 }}>
-                                  수정됨
+                                  {isEn ? 'Modified' : '수정됨'}
                                 </span>
                               )}
                             </td>
@@ -6517,7 +6658,7 @@ const Dashboard = () => {
                               <span style={styles.badgeCategory}>{getRoleKoreanName(u.role)}</span>
                               {u.enabled === false && (
                                 <span style={{ marginLeft: '5px', color: '#ef4444', fontSize: '11px', fontWeight: 'bold' }}>
-                                  [사용 안함]
+                                  {isEn ? '[Disabled]' : '[사용 안함]'}
                                 </span>
                               )}
                             </td>
@@ -6548,7 +6689,7 @@ const Dashboard = () => {
                                   ...(isStatusModified ? { outline: '2px solid #16a34a' } : {})
                                 }}
                               >
-                                {currentEnabled !== false ? '사용 안함' : '사용 함'}
+                                {currentEnabled !== false ? (isEn ? 'Disable' : '사용 안함') : (isEn ? 'Enable' : '사용 함')}
                               </button>
                             </td>
                             <td style={{ ...styles.td, textAlign: 'center' }}>
@@ -6572,9 +6713,9 @@ const Dashboard = () => {
                                       gap: '4px',
                                       boxShadow: '0 1px 3px rgba(22, 163, 74, 0.25)'
                                     }}
-                                    title="변경사항 저장"
+                                    title={isEn ? "Save changes" : "변경사항 저장"}
                                   >
-                                    💾 저장
+                                    {isEn ? '💾 Save' : '💾 저장'}
                                   </button>
                                   <button
                                     type="button"
@@ -6589,9 +6730,9 @@ const Dashboard = () => {
                                       fontSize: '12px',
                                       cursor: 'pointer'
                                     }}
-                                    title="변경 취소"
+                                    title={isEn ? "Cancel changes" : "변경 취소"}
                                   >
-                                    취소
+                                    {isEn ? 'Cancel' : '취소'}
                                   </button>
                                 </div>
                               ) : (
@@ -6809,10 +6950,12 @@ const Dashboard = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
                     <div>
                       <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>
-                        프로젝트 최종 검증 및 확정 (CONFIRM)
+                        {t('tabHeadApprovalTitle', '프로젝트 최종 검증 및 확정')}
                       </h3>
                       <p style={styles.cardSubtitle}>
-                        감사 프로젝트별 발견사항(CAP)의 조치 및 감사 검증 결과를 종합 검토하고 최종 확정(CONFIRM)을 진행합니다. 모든 발견사항이 조치 완료된 경우에만 확정할 수 있으며, 감사팀은 확정 완료 건을 조회하여 최종 승인 및 완료(Completion)합니다.
+                        {isEn
+                          ? 'Review overall CAP action and audit verification results by project, and proceed with final confirmation & sign-off.'
+                          : '감사 프로젝트별 발견사항(CAP)의 조치 및 감사 검증 결과를 종합 검토하고 최종 확정(CONFIRM)을 진행합니다. 모든 발견사항이 조치 완료된 경우에만 확정할 수 있으며, 감사팀은 확정 완료 건을 조회하여 최종 승인 및 완료(Completion)합니다.'}
                       </p>
                     </div>
                   </div>
@@ -6821,10 +6964,12 @@ const Dashboard = () => {
                   <div style={{ marginTop: '16px', padding: '14px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
                     {/* 법인 선택 필터: 법인장은 본인 법인 전용 고정 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>소속 법인:</label>
+                      <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Corp.:' : '소속 법인:'}
+                      </label>
                       {isHead ? (
                         <div style={{ padding: '6px 12px', backgroundColor: '#e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: 'bold', color: '#1e3a8a', border: '1px solid #cbd5e1' }}>
-                          {userCorp} (본인 법인 전용)
+                          {userCorp} {isEn ? '(Assigned Only)' : '(본인 법인 전용)'}
                         </div>
                       ) : (
                         <select
@@ -6832,7 +6977,7 @@ const Dashboard = () => {
                           onChange={(e) => setFinalProjectFilterCorp(e.target.value)}
                           style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff' }}
                         >
-                          <option value="">전체 법인 ({uniqueCorps.length}개)</option>
+                          <option value="">{isEn ? `All Corps (${uniqueCorps.length})` : `전체 법인 (${uniqueCorps.length}개)`}</option>
                           {uniqueCorps.map(corp => (
                             <option key={corp} value={corp}>{corp}</option>
                           ))}
@@ -6842,26 +6987,30 @@ const Dashboard = () => {
 
                     {/* 결재/진행 상태 필터 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>결재 상태:</label>
+                      <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Status:' : '결재 상태:'}
+                      </label>
                       <select
                         value={finalProjectFilterStatus}
                         onChange={(e) => setFinalProjectFilterStatus(e.target.value)}
                         style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px', backgroundColor: '#fff' }}
                       >
-                        <option value="ALL">전체 상태</option>
-                        <option value="READY">확정 대기 (전체 CAP 검증완료 건)</option>
-                        <option value="CONFIRMED">확정 완료 건</option>
-                        <option value="FREEZE">최종 완료 (Completion) 건</option>
-                        <option value="IN_PROGRESS">진행중 (검증 미완료 건)</option>
+                        <option value="ALL">{isEn ? 'All Status' : '전체 상태'}</option>
+                        <option value="READY">{isEn ? 'Ready for Sign-off' : '확정 대기 (전체 CAP 검증완료 건)'}</option>
+                        <option value="CONFIRMED">{isEn ? 'Confirmed' : '확정 완료 건'}</option>
+                        <option value="FREEZE">{isEn ? 'Completed (Frozen)' : '최종 완료 (Completion) 건'}</option>
+                        <option value="IN_PROGRESS">{isEn ? 'In Progress' : '진행중 (검증 미완료 건)'}</option>
                       </select>
                     </div>
 
                     {/* 프로젝트 검색어 필터 및 조회 버튼 */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '260px' }}>
-                      <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>검색어:</label>
+                      <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>
+                        {isEn ? 'Keyword:' : '검색어:'}
+                      </label>
                       <input
                         type="text"
-                        placeholder="프로젝트명 검색..."
+                        placeholder={isEn ? 'Search project...' : '프로젝트명 검색...'}
                         value={finalProjectSearchText}
                         onChange={(e) => setFinalProjectSearchText(e.target.value)}
                         style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
@@ -6888,12 +7037,12 @@ const Dashboard = () => {
                           whiteSpace: 'nowrap'
                         }}
                       >
-                        조회
+                        {isEn ? 'Search' : '조회'}
                       </button>
                     </div>
 
                     <div style={{ fontSize: '12px', color: '#64748b' }}>
-                      조회 결과: <b>{filteredProjects.length}</b>건
+                      {isEn ? <>Results: <b>{filteredProjects.length}</b></> : <>조회 결과: <b>{filteredProjects.length}</b>건</>}
                     </div>
                   </div>
                 </div>
@@ -6902,30 +7051,32 @@ const Dashboard = () => {
                 <div style={styles.card}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                     <h4 style={{ margin: 0, fontSize: '15px', color: '#1e293b' }}>
-                      감사 프로젝트 목록 ({filteredProjects.length}건)
+                      {isEn ? `Audit Project List (${filteredProjects.length})` : `감사 프로젝트 목록 (${filteredProjects.length}건)`}
                     </h4>
                     <span style={{ fontSize: '12px', color: '#64748b' }}>
-                      ※ 프로젝트 행을 클릭하면 하단에 지적사항(CAP) 서브 그리드가 표시됩니다.
+                      {isEn ? '※ Click a project row to display the CAP sub-grid below.' : '※ 프로젝트 행을 클릭하면 하단에 지적사항(CAP) 서브 그리드가 표시됩니다.'}
                     </span>
                   </div>
 
                   {filteredProjects.length === 0 ? (
                     <div style={styles.noDataBox}>
-                      {isHead ? `'${userCorp}' 소속의 조회 가능한 감사 프로젝트가 없습니다.` : '조건에 부합하는 감사 프로젝트가 없습니다.'}
+                      {isHead 
+                        ? (isEn ? `No projects found for '${userCorp}'.` : `'${userCorp}' 소속의 조회 가능한 감사 프로젝트가 없습니다.`) 
+                        : (isEn ? 'No matching audit projects.' : '조건에 부합하는 감사 프로젝트가 없습니다.')}
                     </div>
                   ) : (
                     <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
                         <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                           <tr>
-                            <th style={{ padding: '10px 12px', width: '50px', textAlign: 'center' }}>선택</th>
-                            <th style={{ padding: '10px 12px', width: '100px' }}>소속 법인</th>
-                            <th style={{ padding: '10px 12px' }}>감사 프로젝트명</th>
-                            <th style={{ padding: '10px 12px', width: '60px', textAlign: 'center' }}>차수</th>
-                            <th style={{ padding: '10px 12px', width: '110px' }}>마감기한</th>
-                            <th style={{ padding: '10px 12px', width: '180px' }}>CAP 검증 진행률</th>
-                            <th style={{ padding: '10px 12px', width: '150px', textAlign: 'center' }}>최종 확정 상태</th>
-                            <th style={{ padding: '10px 12px', width: '110px', textAlign: 'center' }}>프로젝트 상태</th>
+                            <th style={{ padding: '10px 12px', width: '50px', textAlign: 'center' }}>{isEn ? 'Select' : '선택'}</th>
+                            <th style={{ padding: '10px 12px', width: '100px' }}>{isEn ? 'Corporation' : '소속 법인'}</th>
+                            <th style={{ padding: '10px 12px' }}>{isEn ? 'Audit Project Name' : '감사 프로젝트명'}</th>
+                            <th style={{ padding: '10px 12px', width: '60px', textAlign: 'center' }}>{isEn ? 'Round' : '차수'}</th>
+                            <th style={{ padding: '10px 12px', width: '110px' }}>{isEn ? 'Due Date' : '마감기한'}</th>
+                            <th style={{ padding: '10px 12px', width: '180px' }}>{isEn ? 'CAP Verification Rate' : 'CAP 검증 진행률'}</th>
+                            <th style={{ padding: '10px 12px', width: '150px', textAlign: 'center' }}>{isEn ? 'Final Sign-off Status' : '최종 확정 상태'}</th>
+                            <th style={{ padding: '10px 12px', width: '110px', textAlign: 'center' }}>{isEn ? 'Project Status' : '프로젝트 상태'}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -6970,7 +7121,7 @@ const Dashboard = () => {
                                   </strong>
                                 </td>
                                 <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 'bold', color: '#475569' }}>
-                                  {p.round ? `${p.round}차` : '1차'}
+                                  {p.round ? (isEn ? `Round ${p.round}` : `${p.round}차`) : (isEn ? 'Round 1' : '1차')}
                                 </td>
                                 <td style={{ padding: '10px 12px', color: '#64748b' }}>
                                   {p.deadline1st ? p.deadline1st.substring(0, 10) : '-'}
@@ -6989,29 +7140,29 @@ const Dashboard = () => {
                                       />
                                     </div>
                                     <span style={{ fontSize: '12px', fontWeight: 'bold', color: isReady ? '#16a34a' : '#334155', minWidth: '70px', textAlign: 'right' }}>
-                                      {pConfirmed}/{pTotal}건 ({percent}%)
+                                      {pConfirmed}/{pTotal}{isEn ? '' : '건'} ({percent}%)
                                     </span>
                                   </div>
                                 </td>
                                 <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                                   {isHeadConfirmed ? (
                                     <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#16a34a', backgroundColor: '#dcfce7', padding: '3px 8px', borderRadius: '4px', display: 'inline-block' }}>
-                                      확정 완료 ({getAssigneeName(p.headConfirmedBy)})
+                                      {isEn ? 'Confirmed' : '확정 완료'} ({getAssigneeName(p.headConfirmedBy)})
                                     </span>
                                   ) : isReady ? (
                                     <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#d97706', backgroundColor: '#fffbeb', padding: '3px 8px', borderRadius: '4px', display: 'inline-block', border: '1px solid #fde68a' }}>
-                                      확정 대기 (완료 가능)
+                                      {isEn ? 'Ready for Sign-off' : '확정 대기 (완료 가능)'}
                                     </span>
                                   ) : (
                                     <span style={{ fontSize: '11px', color: '#64748b', backgroundColor: '#f1f5f9', padding: '3px 8px', borderRadius: '4px', display: 'inline-block' }}>
-                                      진행중 ({pTotal - pConfirmed}건 미완료)
+                                      {isEn ? `In Progress (${pTotal - pConfirmed} open)` : `진행중 (${pTotal - pConfirmed}건 미완료)`}
                                     </span>
                                   )}
                                 </td>
                                 <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                                   {isFreeze ? (
                                     <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#047857', backgroundColor: '#d1fae5', padding: '3px 8px', borderRadius: '4px' }}>
-                                      완료(Completion)
+                                      {isEn ? 'Completed' : '완료(Completion)'}
                                     </span>
                                   ) : (
                                     <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#0284c7', backgroundColor: '#e0f2fe', padding: '3px 8px', borderRadius: '4px' }}>
@@ -7043,10 +7194,10 @@ const Dashboard = () => {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={currentProj.projectState === 'FREEZE' ? styles.badgeFreeze : styles.badgeOpen}>
-                          {currentProj.projectState === 'FREEZE' ? '프로젝트 완료 (Completion)' : '진행중 (OPEN)'}
+                          {currentProj.projectState === 'FREEZE' ? (isEn ? 'Project Completed (Freeze)' : '프로젝트 완료 (Completion)') : (isEn ? 'In Progress (OPEN)' : '진행중 (OPEN)')}
                         </span>
                         <span style={{ fontSize: '13px', fontWeight: 'bold', color: isAllAuditConfirmed ? '#16a34a' : '#dc2626', backgroundColor: isAllAuditConfirmed ? '#dcfce7' : '#fee2e2', padding: '4px 10px', borderRadius: '6px' }}>
-                          지적사항 검증: {auditConfirmedCapsCount} / {totalCapsCount}건 ({isAllAuditConfirmed ? '100% 완료' : `${totalCapsCount - auditConfirmedCapsCount}건 미완료`})
+                          {isEn ? 'CAP Verification: ' : '지적사항 검증: '}{auditConfirmedCapsCount} / {totalCapsCount}{isEn ? '' : '건'} ({isAllAuditConfirmed ? (isEn ? '100% Completed' : '100% 완료') : (isEn ? `${totalCapsCount - auditConfirmedCapsCount} open` : `${totalCapsCount - auditConfirmedCapsCount}건 미완료`)})
                         </span>
                       </div>
                     </div>
@@ -7058,19 +7209,19 @@ const Dashboard = () => {
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <h4 style={{ margin: 0, fontSize: '14px', color: '#1e293b' }}>
-                              [1단계] 최종 확정 (CONFIRM)
+                              {isEn ? '[Step 1] Final Sign-off (CONFIRM)' : '[1단계] 최종 확정 (CONFIRM)'}
                             </h4>
                             {currentProj.headConfirmedBy ? (
                               <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 8px', borderRadius: '4px' }}>
-                                확정 완료
+                                {isEn ? 'Confirmed' : '확정 완료'}
                               </span>
                             ) : isAllAuditConfirmed ? (
                               <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#d97706', backgroundColor: '#fffbeb', padding: '2px 8px', borderRadius: '4px' }}>
-                                확정 가능
+                                {isEn ? 'Ready for Sign-off' : '확정 가능'}
                               </span>
                             ) : (
                               <span style={{ fontSize: '12px', color: '#dc2626', backgroundColor: '#fee2e2', padding: '2px 8px', borderRadius: '4px' }}>
-                                확정 불가
+                                {isEn ? 'Cannot Sign-off' : '확정 불가'}
                               </span>
                             )}
                           </div>
@@ -7079,21 +7230,25 @@ const Dashboard = () => {
                             {currentProj.headConfirmedBy ? (
                               <div>
                                 <div style={{ color: '#166534', fontWeight: 'bold' }}>
-                                  확정자: {getAssigneeName(currentProj.headConfirmedBy)} ({currentProj.headConfirmedAt ? new Date(currentProj.headConfirmedAt).toLocaleString() : ''})
+                                  {isEn ? 'Confirmed by:' : '확정자:'} {getAssigneeName(currentProj.headConfirmedBy)} ({currentProj.headConfirmedAt ? new Date(currentProj.headConfirmedAt).toLocaleString() : ''})
                                 </div>
                                 {currentProj.headComment && (
                                   <div style={{ marginTop: '4px', color: '#334155' }}>
-                                    확정 의견: {currentProj.headComment}
+                                    {isEn ? 'Comment:' : '확정 의견:'} {currentProj.headComment}
                                   </div>
                                 )}
                               </div>
                             ) : isAllAuditConfirmed ? (
                               <div style={{ color: '#0284c7' }}>
-                                모든 지적사항(CAP)의 감사 검증이 완료되었습니다. 아래 버튼을 눌러 최종 확정(CONFIRM)을 진행해 주십시오.
+                                {isEn 
+                                  ? 'All CAPs have been verified by Audit. Click below to proceed with final sign-off (CONFIRM).'
+                                  : '모든 지적사항(CAP)의 감사 검증이 완료되었습니다. 아래 버튼을 눌러 최종 확정(CONFIRM)을 진행해 주십시오.'}
                               </div>
                             ) : (
                               <div style={{ color: '#dc2626' }}>
-                                프로젝트 내 전체 {totalCapsCount}건 중 <b>{totalCapsCount - auditConfirmedCapsCount}건</b>이 아직 감사 검증완료되지 않아 CONFIRM을 진행할 수 없습니다.
+                                {isEn 
+                                  ? <>Among total {totalCapsCount} CAPs, <b>{totalCapsCount - auditConfirmedCapsCount}</b> are not yet verified. CONFIRM cannot proceed.</>
+                                  : <>프로젝트 내 전체 {totalCapsCount}건 중 <b>{totalCapsCount - auditConfirmedCapsCount}건</b>이 아직 감사 검증완료되지 않아 CONFIRM을 진행할 수 없습니다.</>}
                               </div>
                             )}
                           </div>
@@ -7122,7 +7277,7 @@ const Dashboard = () => {
                                 boxShadow: isAllAuditConfirmed ? '0 2px 6px rgba(0,119,200,0.3)' : 'none'
                               }}
                             >
-                              {isAllAuditConfirmed ? '최종 확정 (CONFIRM 완료)' : '최종 확정 불가 (미완료 CAP 존재)'}
+                              {isAllAuditConfirmed ? (isEn ? 'Final Sign-off (CONFIRM)' : '최종 확정 (CONFIRM 완료)') : (isEn ? 'Cannot Sign-off (Open CAPs Exist)' : '최종 확정 불가 (미완료 CAP 존재)')}
                             </button>
                           )}
                         </div>
@@ -7133,19 +7288,19 @@ const Dashboard = () => {
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <h4 style={{ margin: 0, fontSize: '14px', color: '#1e293b' }}>
-                              [2단계] 감사팀 최종 승인 및 완료 (Completion)
+                              {isEn ? '[Step 2] Audit Team Sign-off & Completion' : '[2단계] 감사팀 최종 승인 및 완료 (Completion)'}
                             </h4>
                             {currentProj.projectState === 'FREEZE' ? (
                               <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#047857', backgroundColor: '#d1fae5', padding: '2px 8px', borderRadius: '4px' }}>
-                                완료
+                                {isEn ? 'Completed' : '완료'}
                               </span>
                             ) : (currentProj.headConfirmedBy || user?.role === 'AUDIT_LEADER' || user?.role === 'SYSTEM_ADMIN') ? (
                               <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#059669', backgroundColor: '#ecfdf5', padding: '2px 8px', borderRadius: '4px' }}>
-                                완료 가능
+                                {isEn ? 'Ready for Completion' : '완료 가능'}
                               </span>
                             ) : (
                               <span style={{ fontSize: '12px', color: '#94a3b8', backgroundColor: '#f1f5f9', padding: '2px 8px', borderRadius: '4px' }}>
-                                최종 확정 대기
+                                {isEn ? 'Pending Final Sign-off' : '최종 확정 대기'}
                               </span>
                             )}
                           </div>
@@ -7154,25 +7309,31 @@ const Dashboard = () => {
                             {currentProj.projectState === 'FREEZE' ? (
                               <div>
                                 <div style={{ color: '#047857', fontWeight: 'bold' }}>
-                                  승인 및 완료 처리 ({getAssigneeName(currentProj.auditLeaderApprovedBy) || '감사팀'} / {currentProj.auditLeaderApprovedAt ? new Date(currentProj.auditLeaderApprovedAt).toLocaleString() : ''})
+                                  {isEn ? 'Approved & Completed by' : '승인 및 완료 처리'} ({getAssigneeName(currentProj.auditLeaderApprovedBy) || (isEn ? 'Audit Team' : '감사팀')} / {currentProj.auditLeaderApprovedAt ? new Date(currentProj.auditLeaderApprovedAt).toLocaleString() : ''})
                                 </div>
                                 {currentProj.auditLeaderComment && (
                                   <div style={{ marginTop: '4px', color: '#334155' }}>
-                                    감사팀 의견: {currentProj.auditLeaderComment}
+                                    {isEn ? 'Audit Comment:' : '감사팀 의견:'} {currentProj.auditLeaderComment}
                                   </div>
                                 )}
                               </div>
                             ) : currentProj.headConfirmedBy ? (
                               <div style={{ color: '#059669' }}>
-                                최종 확정(CONFIRM)이 완료되었습니다. 감사팀에서 내용을 최종 검토한 후 프로젝트를 완료(Completion)할 수 있습니다.
+                                {isEn 
+                                  ? 'Final sign-off complete. Audit team can review and complete the project.' 
+                                  : '최종 확정(CONFIRM)이 완료되었습니다. 감사팀에서 내용을 최종 검토한 후 프로젝트를 완료(Completion)할 수 있습니다.'}
                               </div>
                             ) : (user?.role === 'AUDIT_LEADER' || user?.role === 'SYSTEM_ADMIN') ? (
                               <div style={{ color: '#059669' }}>
-                                감사 책임자 권한으로 프로젝트를 즉시 최종 승인 및 완료(Completion)할 수 있습니다.
+                                {isEn 
+                                  ? 'As Audit Leader, you can immediately approve and complete this project.' 
+                                  : '감사 책임자 권한으로 프로젝트를 즉시 최종 승인 및 완료(Completion)할 수 있습니다.'}
                               </div>
                             ) : (
                               <div style={{ color: '#64748b' }}>
-                                ※ 최종 확정(CONFIRM)이 완료된 건에 한하여 감사팀이 최종 승인 및 완료(Completion)를 실행할 수 있습니다.
+                                {isEn 
+                                  ? '※ Audit team can approve and complete only after final sign-off is done.' 
+                                  : '※ 최종 확정(CONFIRM)이 완료된 건에 한하여 감사팀이 최종 승인 및 완료(Completion)를 실행할 수 있습니다.'}
                               </div>
                             )}
                           </div>
@@ -7201,7 +7362,7 @@ const Dashboard = () => {
                                 boxShadow: (currentProj.headConfirmedBy || user?.role === 'AUDIT_LEADER' || user?.role === 'SYSTEM_ADMIN') ? '0 2px 6px rgba(5,150,105,0.3)' : 'none'
                               }}
                             >
-                              {(currentProj.headConfirmedBy || user?.role === 'AUDIT_LEADER' || user?.role === 'SYSTEM_ADMIN') ? '감사팀 최종 승인 및 완료 (Completion 실행)' : '감사팀 완료 불가 (최종 미확정)'}
+                              {(currentProj.headConfirmedBy || user?.role === 'AUDIT_LEADER' || user?.role === 'SYSTEM_ADMIN') ? (isEn ? 'Audit Final Approval & Completion' : '감사팀 최종 승인 및 완료 (Completion 실행)') : (isEn ? 'Cannot Complete (Pending Sign-off)' : '감사팀 완료 불가 (최종 미확정)')}
                             </button>
                           )}
                         </div>
@@ -7215,31 +7376,33 @@ const Dashboard = () => {
                   <div style={styles.card}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                       <h4 style={{ margin: 0, fontSize: '15px', color: '#1e293b' }}>
-                        해당 프로젝트 등록 발견사항(CAP) 서브 선택 그리드 ({currentProjCaps.length}건)
+                        {isEn ? `Registered Findings (CAP) Sub-grid (${currentProjCaps.length})` : `해당 프로젝트 등록 발견사항(CAP) 서브 선택 그리드 (${currentProjCaps.length}건)`}
                       </h4>
                       <span style={{ fontSize: '12px', color: '#64748b' }}>
-                        ※ 발견사항을 클릭하면 하단에서 상세 지적내용, 법인 조치내역, 증빙 파일 다운로드 및 이력을 검증할 수 있습니다.
+                        {isEn ? '※ Click a finding to view details, action plan, evidence files, and history below.' : '※ 발견사항을 클릭하면 하단에서 상세 지적내용, 법인 조치내역, 증빙 파일 다운로드 및 이력을 검증할 수 있습니다.'}
                       </span>
                     </div>
 
                     {currentProjCaps.length === 0 ? (
-                      <div style={styles.noDataBox}>해당 프로젝트에 등록된 발견사항(CAP)이 없습니다.</div>
+                      <div style={styles.noDataBox}>
+                        {isEn ? 'No findings (CAP) registered for this project.' : '해당 프로젝트에 등록된 발견사항(CAP)이 없습니다.'}
+                      </div>
                     ) : (
                       <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
                           <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                             <tr>
-                              <th style={{ padding: '10px 12px', width: '50px', textAlign: 'center' }}>선택</th>
+                              <th style={{ padding: '10px 12px', width: '50px', textAlign: 'center' }}>{isEn ? 'Select' : '선택'}</th>
                               <th style={{ padding: '10px 12px', width: '50px', textAlign: 'center' }}>No.</th>
-                              <th style={{ padding: '10px 12px', width: '90px' }}>분류</th>
-                              <th style={{ padding: '10px 12px' }}>지적사항(CAP) 제목</th>
+                              <th style={{ padding: '10px 12px', width: '90px' }}>{isEn ? 'Category' : '분류'}</th>
+                              <th style={{ padding: '10px 12px' }}>{isEn ? 'Finding (CAP) Title' : '지적사항(CAP) 제목'}</th>
                               {/* [요구사항 2] 조치 담당자 / 부서 컬럼 (이름으로 표기) */}
-                              <th style={{ padding: '10px 12px', width: '160px' }}>조치 담당자 / 부서</th>
-                              <th style={{ padding: '10px 12px', width: '100px' }}>조치 기한</th>
-                              <th style={{ padding: '10px 12px', width: '100px', textAlign: 'center' }}>피감사 조치상태</th>
-                              <th style={{ padding: '10px 12px', width: '120px', textAlign: 'center' }}>감사 검증상태</th>
-                              <th style={{ padding: '10px 12px', width: '80px', textAlign: 'center' }}>증빙파일</th>
-                              <th style={{ padding: '10px 12px', width: '90px', textAlign: 'center' }}>검증 결과</th>
+                              <th style={{ padding: '10px 12px', width: '160px' }}>{isEn ? 'Assignee / Dept.' : '조치 담당자 / 부서'}</th>
+                              <th style={{ padding: '10px 12px', width: '100px' }}>{isEn ? 'Due Date' : '조치 기한'}</th>
+                              <th style={{ padding: '10px 12px', width: '100px', textAlign: 'center' }}>{isEn ? 'Action Status' : '피감사 조치상태'}</th>
+                              <th style={{ padding: '10px 12px', width: '120px', textAlign: 'center' }}>{isEn ? 'Audit Status' : '감사 검증상태'}</th>
+                              <th style={{ padding: '10px 12px', width: '80px', textAlign: 'center' }}>{isEn ? 'Files' : '증빙파일'}</th>
+                              <th style={{ padding: '10px 12px', width: '90px', textAlign: 'center' }}>{isEn ? 'Result' : '검증 결과'}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -7294,44 +7457,54 @@ const Dashboard = () => {
                                   </td>
                                   <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                                     {cActionStatus === 'COMPLETED' && (
-                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>개선완료</span>
+                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#16a34a', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>
+                                        {isEn ? 'Completed' : '개선완료'}
+                                      </span>
                                     )}
                                     {cActionStatus === 'IN_PROGRESS' && (
-                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#d97706', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px' }}>개선중</span>
+                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#d97706', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px' }}>
+                                        {isEn ? 'In Progress' : '개선중'}
+                                      </span>
                                     )}
                                     {cActionStatus === 'ACTION_IMPOSSIBLE' && (
-                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#dc2626', backgroundColor: '#fee2e2', padding: '2px 6px', borderRadius: '4px' }}>개선불가</span>
+                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#dc2626', backgroundColor: '#fee2e2', padding: '2px 6px', borderRadius: '4px' }}>
+                                        {isEn ? 'Impossible' : '개선불가'}
+                                      </span>
                                     )}
                                     {cActionStatus === 'CONTINUOUS_MANAGEMENT' && (
-                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>지속관리</span>
+                                      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#2563eb', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>
+                                        {isEn ? 'Continuous' : '지속관리'}
+                                      </span>
                                     )}
                                     {cActionStatus === 'NOT_WRITTEN' && (
-                                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>미작성</span>
+                                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                        {isEn ? 'Draft' : '미작성'}
+                                      </span>
                                     )}
                                   </td>
                                   <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                                     {isCapDone ? (
                                       <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#15803d', backgroundColor: '#dcfce7', padding: '3px 8px', borderRadius: '4px' }}>
-                                        감사 검증완료
+                                        {isEn ? 'Verified' : '감사 검증완료'}
                                       </span>
                                     ) : (
                                       <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#b45309', backgroundColor: '#fef3c7', padding: '3px 8px', borderRadius: '4px' }}>
-                                        진행중 ({cStatus})
+                                        {isEn ? `In Progress (${cStatus})` : `진행중 (${cStatus})`}
                                       </span>
                                     )}
                                   </td>
                                   <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '12px' }}>
                                     {capFiles.length > 0 ? (
-                                      <span style={{ fontWeight: 'bold', color: '#0284c7' }}>{capFiles.length}개</span>
+                                      <span style={{ fontWeight: 'bold', color: '#0284c7' }}>{capFiles.length}{isEn ? '' : '개'}</span>
                                     ) : (
                                       <span style={{ color: '#cbd5e1' }}>-</span>
                                     )}
                                   </td>
                                   <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                                     {isCapDone ? (
-                                      <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 'bold' }}>완료</span>
+                                      <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 'bold' }}>{isEn ? 'Done' : '완료'}</span>
                                     ) : (
-                                      <span style={{ fontSize: '12px', color: '#dc2626', fontWeight: 'bold' }}>미완료</span>
+                                      <span style={{ fontSize: '12px', color: '#dc2626', fontWeight: 'bold' }}>{isEn ? 'Open' : '미완료'}</span>
                                     )}
                                   </td>
                                 </tr>
@@ -7350,7 +7523,7 @@ const Dashboard = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#2563eb', backgroundColor: '#eff6ff', padding: '4px 8px', borderRadius: '6px' }}>
-                          상세 검증
+                          {isEn ? 'Detailed Verification' : '상세 검증'}
                         </span>
                         <span style={styles.badgeCategory}>{currentFinding.category}</span>
                         <h3 style={{ margin: 0, fontSize: '16px', color: '#0f172a' }}>
@@ -7360,21 +7533,21 @@ const Dashboard = () => {
                       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
                         {/* [요구사항 2] 담당자 및 담당부서 이름으로 명확히 표기 */}
                         <span style={{ fontSize: '12px', color: '#475569' }}>
-                          조치담당자: <b style={{ color: '#1e293b' }}>{getAssigneeName(currentFinding.assignedUserId)}</b>
+                          {isEn ? 'Assignee:' : '조치담당자:'} <b style={{ color: '#1e293b' }}>{getAssigneeName(currentFinding.assignedUserId)}</b>
                         </span>
                         <span style={{ fontSize: '12px', color: '#475569' }}>
-                          담당부서: <b style={{ color: '#1e293b' }}>{getDeptName(currentFinding.assignedUserId, currentFinding.assignedDeptName)}</b>
+                          {isEn ? 'Dept:' : '담당부서:'} <b style={{ color: '#1e293b' }}>{getDeptName(currentFinding.assignedUserId, currentFinding.assignedDeptName)}</b>
                         </span>
                         <span style={{ fontSize: '12px', color: '#64748b' }}>
-                          조치기한: <b>{currentFinding.actionDeadline ? currentFinding.actionDeadline.substring(0, 10) : '미설정'}</b>
+                          {isEn ? 'Due Date:' : '조치기한:'} <b>{currentFinding.actionDeadline ? currentFinding.actionDeadline.substring(0, 10) : (isEn ? 'Not set' : '미설정')}</b>
                         </span>
                         {(currentFinding.actionPlanStatus || currentFinding.approvalStatus) === 'AUDIT_CONFIRMED' ? (
                           <span style={{ ...styles.badgeStatus, backgroundColor: '#dcfce7', color: '#15803d' }}>
-                            감사 검증종료 (CONFIRM 완료)
+                            {isEn ? 'Audit Verified (CONFIRM Done)' : '감사 검증종료 (CONFIRM 완료)'}
                           </span>
                         ) : (
                           <span style={{ ...styles.badgeStatus, backgroundColor: '#fef3c7', color: '#b45309' }}>
-                            검증 진행중 ({currentFinding.actionPlanStatus || currentFinding.approvalStatus})
+                            {isEn ? 'Under Review' : '검증 진행중'} ({currentFinding.actionPlanStatus || currentFinding.approvalStatus})
                           </span>
                         )}
                       </div>
@@ -7384,10 +7557,10 @@ const Dashboard = () => {
                       {/* 지적 내용 원문 */}
                       <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                         <strong style={{ color: '#334155', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '14px' }}>
-                          지적 내용 (Finding Details)
+                          {isEn ? 'Finding Details' : '지적 내용 (Finding Details)'}
                         </strong>
                         <div
-                          dangerouslySetInnerHTML={{ __html: currentFinding.findingText || '지적 내용이 없습니다.' }}
+                          dangerouslySetInnerHTML={{ __html: currentFinding.findingText || (isEn ? 'No finding details provided.' : '지적 내용이 없습니다.') }}
                           style={{ fontSize: '13px', color: '#1e293b', lineHeight: '1.6', maxHeight: '200px', overflowY: 'auto' }}
                         />
                       </div>
@@ -7395,15 +7568,15 @@ const Dashboard = () => {
                       {/* 법인 조치계획 및 실행 결과 원문 */}
                       <div style={{ backgroundColor: '#f0fdf4', padding: '14px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
                         <strong style={{ color: '#166534', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontSize: '14px' }}>
-                          법인 조치 계획 및 실적 (Action Plan & Result)
+                          {isEn ? 'Action Plan & Result' : '법인 조치 계획 및 실적 (Action Plan & Result)'}
                         </strong>
                         <div
-                          dangerouslySetInnerHTML={{ __html: currentFinding.actionText || '<span style="color:#94a3b8;">등록된 조치 내역이 없습니다.</span>' }}
+                          dangerouslySetInnerHTML={{ __html: currentFinding.actionText || `<span style="color:#94a3b8;">${isEn ? 'No registered action details.' : '등록된 조치 내역이 없습니다.'}</span>` }}
                           style={{ fontSize: '13px', color: '#14532d', lineHeight: '1.6', maxHeight: '200px', overflowY: 'auto' }}
                         />
                         {currentFinding.deptAdditionalContent && (
                           <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed #86efac', fontSize: '12px', color: '#166534' }}>
-                            <b>[유관부서 추가의견]:</b> {currentFinding.deptAdditionalContent}
+                            <b>{isEn ? '[Dept. Additional Comment]:' : '[유관부서 추가의견]:'}</b> {currentFinding.deptAdditionalContent}
                           </div>
                         )}
                       </div>
@@ -7413,16 +7586,16 @@ const Dashboard = () => {
                     <div style={{ marginBottom: '16px', backgroundColor: '#f8fafc', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <strong style={{ color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>
-                          등록된 증빙자료 첨부파일 ({currentAttachments.length}건)
+                          {isEn ? `Evidence Attachments (${currentAttachments.length})` : `등록된 증빙자료 첨부파일 (${currentAttachments.length}건)`}
                         </strong>
                         <span style={{ fontSize: '12px', color: '#64748b' }}>
-                          증빙 파일을 직접 다운로드하여 조치 사실을 육안 검증합니다.
+                          {isEn ? 'Download evidence files directly to visually verify implementation.' : '증빙 파일을 직접 다운로드하여 조치 사실을 육안 검증합니다.'}
                         </span>
                       </div>
 
                       {currentAttachments.length === 0 ? (
                         <div style={{ padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '13px', backgroundColor: '#fff', borderRadius: '6px', border: '1px dashed #cbd5e1' }}>
-                          등록된 첨부 증빙 파일이 없습니다.
+                          {isEn ? 'No evidence files registered.' : '등록된 첨부 증빙 파일이 없습니다.'}
                         </div>
                       ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '10px' }}>
@@ -7445,7 +7618,7 @@ const Dashboard = () => {
                                   {file.fileName}
                                 </div>
                                 <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                                  {file.fileSize ? `${Math.round(file.fileSize / 1024)} KB` : ''} | 등록자: {getAssigneeName(file.uploadedBy)} | {file.createdAt ? file.createdAt.substring(0, 10) : ''}
+                                  {file.fileSize ? `${Math.round(file.fileSize / 1024)} KB` : ''} | {isEn ? 'Uploader:' : '등록자:'} {getAssigneeName(file.uploadedBy)} | {file.createdAt ? file.createdAt.substring(0, 10) : ''}
                                 </div>
                               </div>
                               <button
@@ -7465,7 +7638,7 @@ const Dashboard = () => {
                                   gap: '4px'
                                 }}
                               >
-                                다운로드
+                                {isEn ? 'Download' : '다운로드'}
                               </button>
                             </div>
                           ))}
@@ -7476,13 +7649,17 @@ const Dashboard = () => {
                     {/* 조치 및 검토 이력 타임라인 */}
                     <div style={{ backgroundColor: '#fff', padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <strong style={{ color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', fontSize: '14px' }}>
-                        조치 및 검토 이력 타임라인 ({currentHistories.length}건)
+                        {isEn ? `Action & Review Timeline (${currentHistories.length})` : `조치 및 검토 이력 타임라인 (${currentHistories.length}건)`}
                       </strong>
 
                       {historyLoading ? (
-                        <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>이력 로딩 중...</div>
+                        <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>
+                          {isEn ? 'Loading history...' : '이력 로딩 중...'}
+                        </div>
                       ) : currentHistories.length === 0 ? (
-                        <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>등록된 이력이 없습니다.</div>
+                        <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '12px' }}>
+                          {isEn ? 'No history recorded.' : '등록된 이력이 없습니다.'}
+                        </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
                           {currentHistories.map((h, hIdx) => {
@@ -7504,18 +7681,18 @@ const Dashboard = () => {
                               >
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <span style={{ fontWeight: 'bold', color: '#334155' }}>
-                                    {h.actionType === 'CONFIRM_MEMBER' ? '법인담당자 제출' :
-                                     h.actionType === 'CONFIRM_LEAD' ? '대표담당자 감사실 제출' :
-                                     (h.actionType === 'AUDIT_CONFIRMED' || h.actionType === 'CONFIRM_AUDIT') ? '감사팀 검증종료' :
-                                     h.actionType === 'AUDIT_FEEDBACK' ? '감사팀 보완요청' :
-                                     h.actionType === 'SAVE_DRAFT' ? '조치계획 임시저장' :
-                                     h.actionType === 'UPDATE_CAP' ? '지적사항 정보 수정' :
-                                     h.actionType === 'HEAD_CONFIRM' ? '법인장 최종 확정' :
-                                     h.actionType === 'FREEZE' ? '감사팀 완료 처리' :
-                                     h.actionType || '이력'}
+                                    {h.actionType === 'CONFIRM_MEMBER' ? (isEn ? 'Submitted by Member' : '법인담당자 제출') :
+                                     h.actionType === 'CONFIRM_LEAD' ? (isEn ? 'Submitted to Audit by Rep' : '대표담당자 감사실 제출') :
+                                     (h.actionType === 'AUDIT_CONFIRMED' || h.actionType === 'CONFIRM_AUDIT') ? (isEn ? 'Audit Verified' : '감사팀 검증종료') :
+                                     h.actionType === 'AUDIT_FEEDBACK' ? (isEn ? 'Audit Requested Revision' : '감사팀 보완요청') :
+                                     h.actionType === 'SAVE_DRAFT' ? (isEn ? 'Action Plan Draft Saved' : '조치계획 임시저장') :
+                                     h.actionType === 'UPDATE_CAP' ? (isEn ? 'CAP Info Updated' : '지적사항 정보 수정') :
+                                     h.actionType === 'HEAD_CONFIRM' ? (isEn ? 'Corp Head Final Sign-off' : '법인장 최종 확정') :
+                                     h.actionType === 'FREEZE' ? (isEn ? 'Completed by Audit' : '감사팀 완료 처리') :
+                                     h.actionType || (isEn ? 'History' : '이력')}
                                   </span>
                                   <span style={{ color: '#64748b' }}>
-                                    작업자: <b>{getActorDisplayName(h.actorId)}</b>
+                                    {isEn ? 'Actor:' : '작업자:'} <b>{getActorDisplayName(h.actorId)}</b>
                                   </span>
                                   {h.comments && (
                                     <span style={{ color: '#475569', fontStyle: 'italic' }}>
@@ -7565,20 +7742,26 @@ const Dashboard = () => {
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
               <h3 style={{ margin: 0, color: rejectType === 'LEAD' ? '#dc2626' : '#c2410c' }}>
-                {rejectType === 'LEAD' ? '대표담당자 재수정 요청 (반려)' : '감사실 재작성 요청 (보완)'}
+                {rejectType === 'LEAD' 
+                  ? (isEn ? 'Lead Assignee Revision Request (Reject)' : '대표담당자 재수정 요청 (반려)') 
+                  : (isEn ? 'Audit Dept Rework Request (Supplement)' : '감사실 재작성 요청 (보완)')}
               </h3>
               <button onClick={() => setRejectModalOpen(false)} style={styles.modalCloseBtn}>×</button>
             </div>
             <div style={styles.modalBody}>
               <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#4b5563' }}>
-                대상 항목: <strong>{rejectTargetFinding?.title}</strong>
+                {isEn ? 'Target Item:' : '대상 항목:'} <strong>{rejectTargetFinding?.title}</strong>
               </p>
               <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '6px' }}>
-                {rejectType === 'LEAD' ? '재수정 요청 사유' : '재작성(보완) 요청 사유'} (필수 입력) <span style={{ color: '#ef4444' }}>*</span>
+                {rejectType === 'LEAD' 
+                  ? (isEn ? 'Revision Request Reason' : '재수정 요청 사유') 
+                  : (isEn ? 'Rework/Supplement Request Reason' : '재작성(보완) 요청 사유')} ({isEn ? 'Required' : '필수 입력'}) <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <textarea
                 rows="4"
-                placeholder={rejectType === 'LEAD' ? '담당자가 수정/보완해야 할 구체적인 재수정 요청 사유를 입력하세요...' : '감사실에서 요구하는 구체적인 보완/재작성 사유를 입력하세요...'}
+                placeholder={rejectType === 'LEAD' 
+                  ? (isEn ? 'Enter specific revision request details for the assignee...' : '담당자가 수정/보완해야 할 구체적인 재수정 요청 사유를 입력하세요...') 
+                  : (isEn ? 'Enter specific supplement/rework requirements from audit dept...' : '감사실에서 요구하는 구체적인 보완/재작성 사유를 입력하세요...')}
                 value={rejectReasonText}
                 onChange={(e) => setRejectReasonText(e.target.value)}
                 style={{ ...styles.textarea, width: '100%' }}
@@ -7587,7 +7770,7 @@ const Dashboard = () => {
             </div>
             <div style={styles.modalFooter}>
               <button onClick={() => setRejectModalOpen(false)} style={styles.cancelBtn}>
-                취소
+                {isEn ? 'Cancel' : '취소'}
               </button>
               <button
                 onClick={handleConfirmReject}
@@ -7596,7 +7779,9 @@ const Dashboard = () => {
                   backgroundColor: rejectType === 'LEAD' ? '#dc2626' : '#c2410c'
                 }}
               >
-                {rejectType === 'LEAD' ? '재수정 요청 확정' : '재작성 요청 확정'}
+                {rejectType === 'LEAD' 
+                  ? (isEn ? 'Confirm Revision Request' : '재수정 요청 확정') 
+                  : (isEn ? 'Confirm Rework Request' : '재작성 요청 확정')}
               </button>
             </div>
           </div>
@@ -7609,36 +7794,38 @@ const Dashboard = () => {
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
               <h3 style={{ margin: 0, color: '#2563eb' }}>
-                {auditReviewStatus === 'AUDIT_CONFIRMED' ? '감사 검토 확인 (승인)' : '감사 피드백 / 보완 요청'}
+                {auditReviewStatus === 'AUDIT_CONFIRMED' 
+                  ? (isEn ? 'Audit Review Verification (Approval)' : '감사 검토 확인 (승인)') 
+                  : (isEn ? 'Audit Feedback / Supplement Request' : '감사 피드백 / 보완 요청')}
               </h3>
               <button onClick={() => setAuditReviewModalOpen(false)} style={styles.modalCloseBtn}>×</button>
             </div>
             <div style={styles.modalBody}>
               <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#4b5563' }}>
-                지적사항: <strong>{auditTargetFinding?.title}</strong> ({auditTargetFinding?.project?.projectName})
+                {isEn ? 'Finding:' : '지적사항:'} <strong>{auditTargetFinding?.title}</strong> ({auditTargetFinding?.project?.projectName})
               </p>
 
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '4px' }}>
-                  검토 결과 상태
+                  {isEn ? 'Review Result Status' : '검토 결과 상태'}
                 </label>
                 <select
                   value={auditReviewStatus}
                   onChange={(e) => setAuditReviewStatus(e.target.value)}
                   style={styles.select}
                 >
-                  <option value="AUDIT_CONFIRMED">조치 확인 완료 (최종 승인)</option>
-                  <option value="AUDIT_FEEDBACK">보완 요청 / 피드백</option>
+                  <option value="AUDIT_CONFIRMED">{isEn ? 'Action Verified & Completed (Final Approval)' : '조치 확인 완료 (최종 승인)'}</option>
+                  <option value="AUDIT_FEEDBACK">{isEn ? 'Supplement Request / Feedback' : '보완 요청 / 피드백'}</option>
                 </select>
               </div>
 
               <div>
                 <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '4px' }}>
-                  감사팀 검토 의견 및 피드백 코멘트
+                  {isEn ? 'Audit Review & Feedback Comments' : '감사팀 검토 의견 및 피드백 코멘트'}
                 </label>
                 <textarea
                   rows="4"
-                  placeholder="조치 결과에 대한 종합 의견 또는 보완 필요 사항을 기술하세요..."
+                  placeholder={isEn ? 'Enter overall comments on action result or required supplements...' : '조치 결과에 대한 종합 의견 또는 보완 필요 사항을 기술하세요...'}
                   value={auditReviewComment}
                   onChange={(e) => setAuditReviewComment(e.target.value)}
                   style={{ ...styles.textarea, width: '100%' }}
@@ -7647,10 +7834,10 @@ const Dashboard = () => {
             </div>
             <div style={styles.modalFooter}>
               <button onClick={() => setAuditReviewModalOpen(false)} style={styles.cancelBtn}>
-                취소
+                {isEn ? 'Cancel' : '취소'}
               </button>
               <button onClick={handleConfirmAuditReview} style={styles.primaryBtn}>
-                검토 결과 저장
+                {isEn ? 'Save Review Result' : '검토 결과 저장'}
               </button>
             </div>
           </div>
@@ -7663,24 +7850,30 @@ const Dashboard = () => {
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
               <h3 style={{ margin: 0, color: '#4f46e5' }}>
-                {user?.role === 'AUDIT_LEADER' ? '감사 책임자 조치내용 확인' : '감사 담당자 조치내용 확인'}
+                {user?.role === 'AUDIT_LEADER' 
+                  ? (isEn ? 'Audit Leader Action Verification' : '감사 책임자 조치내용 확인') 
+                  : (isEn ? 'Auditor Action Verification' : '감사 담당자 조치내용 확인')}
               </h3>
               <button onClick={() => setAuditorReviewProjModalOpen(false)} style={styles.modalCloseBtn}>×</button>
             </div>
             <div style={styles.modalBody}>
               <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#4b5563' }}>
-                대상 프로젝트: <strong>{targetAuditProject?.projectName}</strong> ({targetAuditProject?.corpId})
+                {isEn ? 'Target Project:' : '대상 프로젝트:'} <strong>{targetAuditProject?.projectName}</strong> ({targetAuditProject?.corpId})
               </p>
               <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '10px 12px', borderRadius: '6px', marginBottom: '14px', fontSize: '12px', color: '#15803d' }}>
-                ※ 법인장 결재가 완료된 지적사항 및 조치계획 내용을 검토하였음을 확인합니다.
+                {isEn 
+                  ? '※ Confirm that the findings and action plans approved by the Subsidiary Head have been reviewed.' 
+                  : '※ 법인장 결재가 완료된 지적사항 및 조치계획 내용을 검토하였음을 확인합니다.'}
               </div>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '4px' }}>
-                  {user?.role === 'AUDIT_LEADER' ? '감사 책임자 검토 의견 (선택 사항)' : '감사 담당자 검토 의견 (선택 사항)'}
+                  {user?.role === 'AUDIT_LEADER' 
+                    ? (isEn ? 'Audit Leader Review Comments (Optional)' : '감사 책임자 검토 의견 (선택 사항)') 
+                    : (isEn ? 'Auditor Review Comments (Optional)' : '감사 담당자 검토 의견 (선택 사항)')}
                 </label>
                 <textarea
                   rows="3"
-                  placeholder="조치 내용에 대한 담당자 검토 소견을 입력하세요..."
+                  placeholder={isEn ? 'Enter review notes regarding the action contents...' : '조치 내용에 대한 담당자 검토 소견을 입력하세요...'}
                   value={auditProjCommentInput}
                   onChange={(e) => setAuditProjCommentInput(e.target.value)}
                   style={{ ...styles.textarea, width: '100%' }}
@@ -7689,10 +7882,12 @@ const Dashboard = () => {
             </div>
             <div style={{ ...styles.modalFooter, display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <button onClick={() => setAuditorReviewProjModalOpen(false)} style={styles.cancelBtn}>
-                취소
+                {isEn ? 'Cancel' : '취소'}
               </button>
               <button onClick={handleConfirmAuditorProjReview} style={{ ...styles.primaryBtn, backgroundColor: '#4f46e5' }}>
-                {user?.role === 'AUDIT_LEADER' ? '내용 확인만 완료' : '확인 완료'}
+                {user?.role === 'AUDIT_LEADER' 
+                  ? (isEn ? 'Review Only (Confirm)' : '내용 확인만 완료') 
+                  : (isEn ? 'Confirm Review' : '확인 완료')}
               </button>
               {(user?.role === 'AUDIT_LEADER' || user?.role === 'SYSTEM_ADMIN') && (
                 <button
@@ -7705,9 +7900,9 @@ const Dashboard = () => {
                     alignItems: 'center',
                     gap: '4px'
                   }}
-                  title="조치내용 확인과 동시에 프로젝트를 최종 확정하고 완료(Completion)합니다."
+                  title={isEn ? 'Review action contents and immediately complete the project.' : '조치내용 확인과 동시에 프로젝트를 최종 확정하고 완료(Completion)합니다.'}
                 >
-                  확인 및 즉시 최종 완료 (Completion)
+                  {isEn ? 'Confirm & Immediate Completion' : '확인 및 즉시 최종 완료 (Completion)'}
                 </button>
               )}
             </div>
@@ -7721,30 +7916,32 @@ const Dashboard = () => {
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
               <h3 style={{ margin: 0, color: '#059669' }}>
-                감사 책임자 최종 확정 및 완료 (Completion)
+                {isEn ? 'Audit Leader Final Confirmation & Completion' : '감사 책임자 최종 확정 및 완료 (Completion)'}
               </h3>
               <button onClick={() => setLeaderApproveProjModalOpen(false)} style={styles.modalCloseBtn}>×</button>
             </div>
             <div style={styles.modalBody}>
               <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#4b5563' }}>
-                대상 프로젝트: <strong>{targetAuditProject?.projectName}</strong> ({targetAuditProject?.corpId})
+                {isEn ? 'Target Project:' : '대상 프로젝트:'} <strong>{targetAuditProject?.projectName}</strong> ({targetAuditProject?.corpId})
               </p>
               {targetAuditProject?.auditorReviewedBy && (
                 <div style={{ backgroundColor: '#e0e7ff', border: '1px solid #c7d2fe', padding: '10px 12px', borderRadius: '6px', marginBottom: '12px', fontSize: '12px', color: '#3730a3' }}>
-                  감사 담당자 확인: <b>{targetAuditProject.auditorReviewedBy}</b> ({targetAuditProject.auditorReviewedAt ? new Date(targetAuditProject.auditorReviewedAt).toLocaleString() : ''})<br />
-                  {targetAuditProject.auditorComment && `의견: "${targetAuditProject.auditorComment}"`}
+                  {isEn ? 'Auditor Verification:' : '감사 담당자 확인:'} <b>{targetAuditProject.auditorReviewedBy}</b> ({targetAuditProject.auditorReviewedAt ? new Date(targetAuditProject.auditorReviewedAt).toLocaleString() : ''})<br />
+                  {targetAuditProject.auditorComment && `${isEn ? 'Comment:' : '의견:'} "${targetAuditProject.auditorComment}"`}
                 </div>
               )}
               <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', padding: '10px 12px', borderRadius: '6px', marginBottom: '14px', fontSize: '12px', color: '#065f46' }}>
-                ※ 최종 확정 시 프로젝트가 <b>완료(Completion)</b> 처리되며, 법인 및 담당자의 추가 수정이 차단됩니다.
+                {isEn 
+                  ? '※ Upon final confirmation, the project is marked as Completed, and further edits by subsidiaries/assignees are blocked.' 
+                  : '※ 최종 확정 시 프로젝트가 완료(Completion) 처리되며, 법인 및 담당자의 추가 수정이 차단됩니다.'}
               </div>
               <div>
                 <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '4px' }}>
-                  감사 책임자 확정 의견 (선택 사항)
+                  {isEn ? 'Audit Leader Confirmation Comments (Optional)' : '감사 책임자 확정 의견 (선택 사항)'}
                 </label>
                 <textarea
                   rows="3"
-                  placeholder="최종 확정 및 완료 의견을 입력하세요..."
+                  placeholder={isEn ? 'Enter final confirmation and completion comments...' : '최종 확정 및 완료 의견을 입력하세요...'}
                   value={auditProjCommentInput}
                   onChange={(e) => setAuditProjCommentInput(e.target.value)}
                   style={{ ...styles.textarea, width: '100%' }}
@@ -7753,10 +7950,10 @@ const Dashboard = () => {
             </div>
             <div style={styles.modalFooter}>
               <button onClick={() => setLeaderApproveProjModalOpen(false)} style={styles.cancelBtn}>
-                취소
+                {isEn ? 'Cancel' : '취소'}
               </button>
               <button onClick={handleConfirmLeaderProjApprove} style={{ ...styles.approveActionBtn, backgroundColor: '#059669' }}>
-                최종 확정 및 완료 (Completion) 실행
+                {isEn ? 'Execute Final Confirmation & Completion' : '최종 확정 및 완료 (Completion) 실행'}
               </button>
             </div>
           </div>
@@ -7768,19 +7965,21 @@ const Dashboard = () => {
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
-              <h3 style={{ margin: 0, color: '#dc2626' }}>감사 보완요청 (반려)</h3>
+              <h3 style={{ margin: 0, color: '#dc2626' }}>
+                {isEn ? 'Audit Supplement Request (Reject)' : '감사 보완요청 (반려)'}
+              </h3>
               <button onClick={() => setAuditRejectProjModalOpen(false)} style={styles.modalCloseBtn}>×</button>
             </div>
             <div style={styles.modalBody}>
               <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#4b5563' }}>
-                대상 프로젝트: <strong>{targetAuditProject?.projectName}</strong> ({targetAuditProject?.corpId})
+                {isEn ? 'Target Project:' : '대상 프로젝트:'} <strong>{targetAuditProject?.projectName}</strong> ({targetAuditProject?.corpId})
               </p>
               <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#374151', display: 'block', marginBottom: '6px' }}>
-                보완요청 사유 (필수 입력) <span style={{ color: '#ef4444' }}>*</span>
+                {isEn ? 'Supplement Request Reason (Required)' : '보완요청 사유 (필수 입력)'} <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <textarea
                 rows="4"
-                placeholder="법인 및 조치 담당자가 수정/보완해야 할 사유를 상세히 입력하세요..."
+                placeholder={isEn ? 'Enter detailed reason for rework/supplement required from subsidiary and assignees...' : '법인 및 조치 담당자가 수정/보완해야 할 사유를 상세히 입력하세요...'}
                 value={auditProjRejectReasonInput}
                 onChange={(e) => setAuditProjRejectReasonInput(e.target.value)}
                 style={{ ...styles.textarea, width: '100%' }}
@@ -7789,10 +7988,10 @@ const Dashboard = () => {
             </div>
             <div style={styles.modalFooter}>
               <button onClick={() => setAuditRejectProjModalOpen(false)} style={styles.cancelBtn}>
-                취소
+                {isEn ? 'Cancel' : '취소'}
               </button>
               <button onClick={handleConfirmAuditProjReject} style={styles.confirmRejectBtn}>
-                보완요청 확정
+                {isEn ? 'Confirm Supplement Request' : '보완요청 확정'}
               </button>
             </div>
           </div>

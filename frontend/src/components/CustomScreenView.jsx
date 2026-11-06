@@ -1,7 +1,10 @@
 import React, { useEffect } from 'react';
+import { useLanguage } from '../context/LanguageContext';
 import { checkSessionOrRedirect } from '../utils/authUtils';
 
 const CustomScreenView = ({ menu }) => {
+  const { isEn, getMenuName } = useLanguage();
+
   useEffect(() => {
     checkSessionOrRedirect();
   }, []);
@@ -9,7 +12,7 @@ const CustomScreenView = ({ menu }) => {
   if (!menu) {
     return (
       <div style={styles.emptyContainer}>
-        <h3>화면 정보를 불러올 수 없습니다.</h3>
+        <h3>{isEn ? 'Screen information unavailable.' : '화면 정보를 불러올 수 없습니다.'}</h3>
       </div>
     );
   }
@@ -22,12 +25,12 @@ const CustomScreenView = ({ menu }) => {
         <div style={styles.header}>
           <div style={styles.titleRow}>
             <div>
-              <h3 style={styles.title}>{menu.menuName}</h3>
+              <h3 style={styles.title}>{getMenuName(menu)}</h3>
               <span style={styles.badge}>{menu.menuCode}</span>
             </div>
           </div>
           {menu.description && (
-            <p style={styles.subtitle}>{menu.description}</p>
+            <p style={styles.subtitle}>{isEn ? getMenuName(menu) : menu.description}</p>
           )}
         </div>
 
@@ -35,7 +38,9 @@ const CustomScreenView = ({ menu }) => {
           {isExternalUrl ? (
             <div style={styles.externalBox}>
               <p style={{ marginBottom: '15px', color: '#4b5563', fontSize: '13px' }}>
-                ※ 외부 연계 시스템 화면입니다. 아래 버튼을 클릭하여 새 창에서 열거나 연결할 수 있습니다.
+                {isEn 
+                  ? '※ This is an external system screen. Click the button below to open in a new window or link.' 
+                  : '※ 외부 연계 시스템 화면입니다. 아래 버튼을 클릭하여 새 창에서 열거나 연결할 수 있습니다.'}
               </p>
               {menu.customContent && (
                 <div style={{ marginBottom: '15px' }}>
@@ -45,7 +50,7 @@ const CustomScreenView = ({ menu }) => {
                     rel="noopener noreferrer"
                     style={styles.linkButton}
                   >
-                    외부 사이트 바로가기 ({menu.customContent})
+                    {isEn ? 'Open External Site' : '외부 사이트 바로가기'} ({menu.customContent})
                   </a>
                 </div>
               )}
@@ -67,9 +72,11 @@ const CustomScreenView = ({ menu }) => {
                 />
               ) : (
                 <div style={styles.noContent}>
-                  <p>등록된 화면 콘텐츠 내용이 없습니다.</p>
+                  <p>{isEn ? 'No screen content registered.' : '등록된 화면 콘텐츠 내용이 없습니다.'}</p>
                   <span style={{ fontSize: '12px', color: '#9ca3af' }}>
-                    [화면 / 메뉴 관리]에서 화면 내용을 추가하거나 수정해 주세요.
+                    {isEn 
+                      ? 'Please add or edit screen content in [Screen / Menu Management].' 
+                      : '[화면 / 메뉴 관리]에서 화면 내용을 추가하거나 수정해 주세요.'}
                   </span>
                 </div>
               )}

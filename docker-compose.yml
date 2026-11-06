@@ -6,10 +6,10 @@ services:
     container_name: auditcap-backend
     restart: always
     environment:
-      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
-      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
-      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
-      - JWT_SECRET=${JWT_SECRET}
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL:-jdbc:sqlserver://db.sae-a.com:1433;databaseName=gains;encrypt=true;trustServerCertificate=true}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME:-gains}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD:-!Dudehdeofh429#}
+      - JWT_SECRET=${JWT_SECRET:-dGhpc2lzYXNlY3JldGtleWZvcmNhcG1vbml0b3JpbmdzeXN0ZW1qd3R0b2tlbnNlY3VyZQ==}
       - APP_UPLOAD_PATH=/app/uploads
       - APP_MANUAL_PATH=/data/auditcap/SAE-A_CAP_Integrated_Manual.pptx
       - SPRING_JPA_SHOW_SQL=false
